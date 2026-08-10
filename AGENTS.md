@@ -45,9 +45,26 @@ mistake would point the live Worker at the clone and silently write inbound mail
 into it, which is why the names differ rather than relying on remembering
 `--env production`.
 
-Secrets do NOT come from the build — the Worker reads its own secret store,
-populated by the Infisical secret sync. Deploying before that sync exists gives
-a Worker that boots and then fails on every request.
+### Build time and runtime need separate wiring
+
+Infisical feeds two different places, and dropping either breaks something:
+
+| | feeds | symptom if missing |
+|---|---|---|
+| `infisical run` around the build | varlock validation, and inlining public values into the artifact | build fails: "Value is required but is currently empty" (all 11 items) |
+| Infisical → Cloudflare **secret sync** | the deployed Worker's runtime `env` | build and deploy succeed, then every request fails |
+
+Nine values are read as `env.API_TOKEN`, `env.PUSHER_*` and so on — Cloudflare
+binding lookups that only the Worker's secret store populates. `CLERK_SECRET_KEY`
+is read by the Clerk SDK from `process.env`, which OpenNext fills from the same
+store. **Build-time injection does not carry into the deployed Worker.**
+
+`pnpm deploy` from this machine handles the build half with your own Infisical
+login. For Cloudflare Workers Builds, `scripts/ciBuild.sh` (`pnpm ci:build`) does
+it with a machine identity instead — set `INFISICAL_CLIENT_ID` and
+`INFISICAL_CLIENT_SECRET` as build *secrets* in the Cloudflare dashboard. The
+deploy command there must be `npx wrangler deploy --env production`, or CI
+publishes the dev Worker.
 
 Deploying does not affect live mail or the live site: Email Routing still points
 at the old `email-service` Worker and `emails.wylynko.me` still resolves to
