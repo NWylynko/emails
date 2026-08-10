@@ -77,20 +77,21 @@ forwards `x-forwarded-host: localhost`, and Next rejects Server Actions whose
 - **`assets` must be bound in `wrangler.jsonc`** (`.open-next/assets`). Without
   it the app serves HTML fine and every chunk, stylesheet and image 404s — which
   looks like a working app to a curl check.
-- **`turndown` hangs the Worker on *some* email HTML.** Not a general
-  incompatibility — `nodejs_compat` gives it what it needs and it converts most
-  emails in single-digit ms. But specific real-world email HTML sends it into a
-  non-terminating loop **under workerd only**. Measured against the dev database:
+- **A module-scope database client breaks every second request.**
+  `src/database/index.ts` builds an `@neondatabase/serverless` client at module
+  scope. Module scope persists across requests in a Worker isolate, so request 2
+  reuses a promise created in request 1's context and workerd cancels it with
+  "your Worker's code had hung and would never generate a response" — instantly,
+  in ~10ms, despite the wording. Six consecutive requests to the same route:
 
-  | email | plain Node 24 | workerd |
-  |-------|---------------|---------|
-  | 143 (7.8k) | 12ms | 3ms |
-  | 3003 (10.7k) | **6ms** | **hangs** |
-  | 3005 (17.9k) | 7ms | 22ms |
+  | driver | result |
+  |--------|--------|
+  | module-scope `@neondatabase/serverless` | 200, 500, 200, 500, 200, 500 |
+  | per-request Hyperdrive + postgres.js | 200 × 6 |
 
-  Content-dependent, not size-dependent, and identical input is fine in Node. Any
-  inbound email may carry HTML that hangs a request until the runtime kills it.
-  Do not put turndown on a server-side path in this Worker. Unresolved — see below.
+  **Build the client per request** from `getCloudflareContext().env.HYPERDRIVE`.
+  This is easy to misdiagnose: alternating failures over a list of different
+  inputs read exactly like "these particular records are broken". They are not.
 
 ## Types
 
@@ -143,9 +144,8 @@ Done:
 
 Not done:
 
-- `/email/[id]/html` hangs on some emails (turndown under workerd, see above).
-  Options: move the turndown pass into the browser, where it demonstrably works;
-  or sanitise with `HTMLRewriter` server-side and render real HTML.
+- Every DB-backed page still fails on alternate requests until the module-scope
+  neon client is replaced (see above). This is the next thing to fix.
 - Still on the old externals: `@neondatabase/serverless` + `DATABASE_URL`,
   `@aws-sdk/*` presigned R2 URLs, Workers AI over REST with `CLOUDFLARE_AI_KEY`.
   All three should become bindings (`HYPERDRIVE`, `ATTACHMENTS`, `AI`).

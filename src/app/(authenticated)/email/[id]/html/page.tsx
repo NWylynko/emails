@@ -4,7 +4,8 @@ import * as driz from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import ReactMarkdown from "react-markdown";
-import turndown from "turndown";
+import remarkGfm from "remark-gfm";
+import { emailHtmlToMarkdown } from "@/email/emailHtmlToMarkdown";
 
 const emailQuery = db
   .select({
@@ -29,11 +30,12 @@ export default async function EmailPage(props: PageProps<"/email/[id]/html">) {
     return <div>No HTML body</div>;
   }
 
-  const TurndownService = new turndown();
+  const markdown = await emailHtmlToMarkdown(email.html);
 
   return (
     <ReactMarkdown
-      children={TurndownService.turndown(email.html)}
+      children={markdown}
+      remarkPlugins={[remarkGfm]}
       components={{
         h1: ({ node, ...props }) => <h1 className="text-3xl" {...props} />,
         h2: ({ node, ...props }) => <h2 className="text-2xl" {...props} />,
