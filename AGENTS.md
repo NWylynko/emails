@@ -25,6 +25,34 @@ cli/                 the Rust `emails` CLI (crate name `emails`, binary `emails`
 scripts/generateCloudflareTypes.mjs   see "Types" below
 ```
 
+## Deploying
+
+`pnpm deploy` builds under `infisical run --env=prod` and deploys with
+`--env production`. The build must happen under prod values because the Clerk
+publishable key is inlined into client assets — a dev-built artifact carries dev
+Clerk keys.
+
+Two Workers, deliberately named differently:
+
+| command | Worker | database |
+|---------|--------|----------|
+| `pnpm deploy` | `emails` | ep-purple-bread (**production**) |
+| `pnpm deploy:dev` | `emails-dev` | ep-flat-king (clone) |
+
+The top-level wrangler config is the dev one and is named `emails-dev`, so a
+bare `wrangler deploy` cannot overwrite production with dev bindings. That
+mistake would point the live Worker at the clone and silently write inbound mail
+into it, which is why the names differ rather than relying on remembering
+`--env production`.
+
+Secrets do NOT come from the build — the Worker reads its own secret store,
+populated by the Infisical secret sync. Deploying before that sync exists gives
+a Worker that boots and then fails on every request.
+
+Deploying does not affect live mail or the live site: Email Routing still points
+at the old `email-service` Worker and `emails.wylynko.me` still resolves to
+Vercel until those are changed explicitly.
+
 ## Databases — read this before running anything
 
 Two Neon databases, and they are **not** the same:
@@ -48,7 +76,8 @@ under `env.production`. Verified safety properties:
 
 ```bash
 pnpm preview      # build + run the Worker on localhost:8788  <- the real thing
-pnpm deploy       # build + opennextjs-cloudflare deploy
+pnpm deploy       # build under --env=prod + deploy to the `emails` Worker
+pnpm deploy:dev   # same, but to the separate `emails-dev` Worker
 pnpm dev:worker   # run the last build without rebuilding
 pnpm dev          # plain next dev; bindings via initOpenNextCloudflareForDev()
 pnpm cf:build
