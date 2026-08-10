@@ -166,6 +166,13 @@ forwards `x-forwarded-host: localhost`, and Next rejects Server Actions whose
   instead of going out to the public internet.
 - Keep `compatibility_date` roughly current with the installed workerd, or every
   build prints a staleness warning.
+- **`initOpenNextCloudflareForDev()` must be guarded** to `NODE_ENV ===
+  "development"`. `next.config.ts` is evaluated during `next build` too, and that
+  call starts miniflare, which refuses to emulate Hyperdrive without
+  `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE`. That variable
+  exists only in the dev environment, so an unguarded call fails every CI build
+  with "you should use a local Postgres connection string" — a message that
+  sounds like a local-setup problem while actually breaking production builds.
 - `main` is `worker.ts`, not the adapter's default `.open-next/worker.js` — that
   is the documented custom-worker override, and it is what allows `email()` to
   live alongside `fetch`.
