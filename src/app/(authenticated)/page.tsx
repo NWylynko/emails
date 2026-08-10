@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { listInboxesWithCounts } from "@/inbox/inboxQueries";
 import { connection } from "next/server";
 import { RefreshButton } from "@/components/RefreshButton";
@@ -15,6 +16,7 @@ export default async function Home(props: PageProps<"/">) {
   await connection();
 
   const inboxes = await listInboxesWithCounts();
+  const { env } = getCloudflareContext();
 
   return (
     <div className="space-y-4">
@@ -32,7 +34,7 @@ export default async function Home(props: PageProps<"/">) {
               <SignOutButton>
                 <Button>Sign out</Button>
               </SignOutButton>
-              <PushNotifications />
+              <PushNotifications instanceId={env.BEAMS_INSTANCE_ID} />
               <GenerateBotToken />
             </DialogContent>
           </Dialog>

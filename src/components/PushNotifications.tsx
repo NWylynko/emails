@@ -6,10 +6,15 @@ import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner"
 import { Loader2 } from "lucide-react";
 
-const INSTANCE_ID = '656479b8-e3ae-4b4e-852f-4af9c65d27a8';
 const INTEREST = 'emails';
 
-export const PushNotifications = () => {
+/**
+ * `instanceId` is a public identifier — the Beams browser SDK needs it to
+ * register a device — so it arrives as a prop from the server page rather than
+ * being hardcoded or exposed via NEXT_PUBLIC_. The matching secret
+ * (BEAMS_SECRET) never leaves the Worker.
+ */
+export const PushNotifications = (props: { instanceId: string }) => {
   const [isSettingUp, setIsSettingUp] = useState(false);
   const [isRemoving, setIsRemoving] = useState(false);
   const [isRegistered, setIsRegistered] = useState<boolean | null>(null);
@@ -18,7 +23,7 @@ export const PushNotifications = () => {
 
   useEffect(() => {
     const client = new PusherPushNotifications.Client({
-      instanceId: INSTANCE_ID,
+      instanceId: props.instanceId,
     });
     setBeamsClient(client);
 
@@ -49,7 +54,7 @@ export const PushNotifications = () => {
     return () => {
       setBeamsClient(null);
     };
-  }, []);
+  }, [props.instanceId]);
 
   const handleSetup = useCallback(async () => {
     if (!beamsClient) return;
