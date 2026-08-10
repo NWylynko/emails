@@ -1,22 +1,21 @@
-import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
-import { getCloudflareContext } from "@opennextjs/cloudflare";
-import { listInboxesWithCounts } from "@/inbox/inboxQueries";
-import { connection } from "next/server";
+import { GenerateBotToken } from "@/components/GenerateBotToken";
+import { PushNotifications } from "@/components/PushNotifications";
 import { RefreshButton } from "@/components/RefreshButton";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { listInboxesWithCounts } from "@/inbox/inboxQueries";
+import { SignOutButton } from "@clerk/nextjs";
 import { DialogTrigger } from "@radix-ui/react-dialog";
 import { CogIcon } from "lucide-react";
-import { PushNotifications } from "@/components/PushNotifications";
-import { Button } from "@/components/ui/button";
-import { SignOutButton } from "@clerk/nextjs";
-import { GenerateBotToken } from "@/components/GenerateBotToken";
+import Link from "next/link";
+import { connection } from "next/server";
+import { ENV } from "varlock/env";
 
 export default async function Home(props: PageProps<"/">) {
   await connection();
 
   const inboxes = await listInboxesWithCounts();
-  const { env } = getCloudflareContext();
 
   return (
     <div className="space-y-4">
@@ -34,7 +33,7 @@ export default async function Home(props: PageProps<"/">) {
               <SignOutButton>
                 <Button>Sign out</Button>
               </SignOutButton>
-              <PushNotifications instanceId={env.BEAMS_INSTANCE_ID} />
+              <PushNotifications instanceId={ENV.BEAMS_INSTANCE_ID} />
               <GenerateBotToken />
             </DialogContent>
           </Dialog>

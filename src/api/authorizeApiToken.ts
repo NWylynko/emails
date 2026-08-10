@@ -1,4 +1,4 @@
-import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { ENV } from "varlock/env";
 
 /**
  * Bearer-token auth for the `/v1` CLI API.
@@ -20,14 +20,13 @@ function timingSafeEqual(a: string, b: string): boolean {
 }
 
 export function isAuthorizedApiRequest(request: Request): boolean {
-  const { env } = getCloudflareContext();
   const header = request.headers.get("Authorization");
 
-  if (!header?.startsWith("Bearer ") || !env.API_TOKEN) {
+  if (!header?.startsWith("Bearer ") || !ENV.API_TOKEN) {
     return false;
   }
 
-  return timingSafeEqual(header.slice("Bearer ".length), env.API_TOKEN);
+  return timingSafeEqual(header.slice("Bearer ".length), ENV.API_TOKEN);
 }
 
 export function unauthorizedResponse(): Response {

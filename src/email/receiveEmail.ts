@@ -20,27 +20,29 @@ import { stashOversizedEmailPart } from "./stashOversizedEmailPart";
 import { sendViaResend } from "./sendViaResend";
 import { pusherUpdatePing } from "@/notification/pusherUpdatePing";
 import { notifyAboutEmail } from "@/notification/notifyAboutEmail";
+import { ENV } from "varlock/env"
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 
 /** Mail from this address is a forward request, not ordinary inbound mail. */
 const PROXY_SENDER = "nick@wylynko.com";
 
 export async function receiveEmail(
   message: ForwardableEmailMessage,
-  env: CloudflareEnv
 ) {
-  const db = createEmailsDbFromEnv(env);
+  const cloudflare = getCloudflareContext()
+  const db = createEmailsDbFromEnv(cloudflare.env.HYPERDRIVE);
 
   const email = await simpleParser(await streamToString(message.raw));
 
   // An inlined photo can push these past the varchar(1_000_000) columns and
   // fail the INSERT, which used to take the whole handler down with it.
   const storedBody = await stashOversizedEmailPart(
-    env.ATTACHMENTS,
+    cloudflare.env.ATTACHMENTS,
     "body",
     email.text ?? "[no body]"
   );
   const storedHtml = email.html
-    ? await stashOversizedEmailPart(env.ATTACHMENTS, "html", email.html)
+    ? await stashOversizedEmailPart(cloudflare.env.ATTACHMENTS, "html", email.html)
     : undefined;
 
   const [result] = await db
@@ -56,7 +58,7 @@ export async function receiveEmail(
     .returning({ emailId: emails.emailId });
 
   for (const attachment of email.attachments) {
-    const object = await env.ATTACHMENTS.put(
+    const object = await cloudflare.env.ATTACHMENTS.put(
       crypto.randomUUID(),
       attachment.content,
       { md5: attachment.checksum }
@@ -76,7 +78,7 @@ export async function receiveEmail(
     });
   }
 
-  await pusherUpdatePing(env);
+  await pusherUpdatePing();
 
   const [inbox] = await db
     .select({ silent: inboxes.silent, receiver: inboxes.receiver })
@@ -99,7 +101,6 @@ export async function receiveEmail(
   if (message.from !== PROXY_SENDER) {
     if (inbox?.silent !== true) {
       await notifyAboutEmail(
-        env,
         result.emailId,
         `New Email for ${message.to}`,
         email.subject ?? message.from
@@ -114,7 +115,7 @@ export async function receiveEmail(
   // credential it does not use — and a failed delivery is retried by Email
   // Routing, so that would duplicate rows for all inbound mail, not just
   // forwards.
-  const resend = new Resend(env.RESEND_KEY);
+  const resend = new Resend(ENV.RESEND_KEY);
 
   // Forward-on path. Each failure mode mails Nick back rather than silently
   // dropping the message.
@@ -165,7 +166,6 @@ export async function receiveEmail(
   });
 
   await notifyAboutEmail(
-    env,
     result.emailId,
     `Email sent to ${inbox.receiver}`,
     `Email sent to ${inbox.receiver}`

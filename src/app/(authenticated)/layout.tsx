@@ -1,6 +1,6 @@
-import { getCloudflareContext } from "@opennextjs/cloudflare";
-import { connection } from "next/server";
 import { UpdatesProvider } from "@/providers/UpdatesProvider";
+import { connection } from "next/server";
+import { ENV } from "varlock/env";
 
 export default async function AuthenticatedLayout(props: LayoutProps<"/">) {
   // Reading the Worker env means this cannot be prerendered — `connection()`
@@ -8,12 +8,10 @@ export default async function AuthenticatedLayout(props: LayoutProps<"/">) {
   // it `getCloudflareContext()` throws during the static export pass.
   await connection();
 
-  const { env } = getCloudflareContext();
-
   return (
     <UpdatesProvider
-      pusherKey={env.PUSHER_KEY}
-      pusherCluster={env.PUSHER_CLUSTER}
+      pusherKey={ENV.PUSHER_KEY}
+      pusherCluster={ENV.PUSHER_CLUSTER}
     >
       {props.children}
     </UpdatesProvider>

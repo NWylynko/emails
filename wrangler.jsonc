@@ -8,53 +8,30 @@
    *
    * Production is `wrangler deploy --env production`, which `pnpm deploy` does.
    */
-  "name": "emails-dev",
+  "name": "emails",
   "main": "worker.ts",
   "compatibility_date": "2026-08-04",
-  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "workers_dev": true,
   "observability": { "enabled": true },
-
-  // Next's static output (/_next/static, public/). Without this the app serves
-  // HTML but every chunk, stylesheet and image 404s.
-  "assets": {
-    "directory": ".open-next/assets",
-    "binding": "ASSETS"
-  },
-
-  /**
-   * Hyperdrive -> Neon.
-   *
-   * `id` here is the DEV config (neon-email-database-dev -> ep-flat-king), a
-   * clone that is safe to develop against. Production (neon-email-database ->
-   * ep-purple-bread) is set under env.production below.
-   *
-   * NOTE: `wrangler dev --remote` uses the DEPLOYED Hyperdrive config. Do not
-   * use that flag on this project.
-   */
-  "hyperdrive": [
-    {
-      "binding": "HYPERDRIVE",
-      "id": "1b02e5c500e54d719ff1ab29ce9bf2ea"
-    }
-  ],
-
-  "r2_buckets": [
-    {
-      "binding": "ATTACHMENTS",
-      "bucket_name": "email-attachments"
-    }
-  ],
-
-  "ai": { "binding": "AI" },
-
+  "placement": { "mode": "smart" },
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "env": {
+    "development": {
+      "hyperdrive": [
+        {
+          "binding": "HYPERDRIVE",
+          "id": "1b02e5c500e54d719ff1ab29ce9bf2ea"
+        }
+      ],
+      "r2_buckets": [
+        {
+          "binding": "ATTACHMENTS",
+          "bucket_name": "email-attachments"
+        }
+      ],
+      "ai": { "binding": "AI" },
+    },
     "production": {
-      "name": "emails",
-      "workers_dev": true,
-      "observability": { "enabled": true },
-      "placement": { "mode": "smart" },
-      "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
       "assets": {
         "directory": ".open-next/assets",
         "binding": "ASSETS"
@@ -71,7 +48,7 @@
           "bucket_name": "email-attachments"
         }
       ],
-      "ai": { "binding": "AI" }
+      "ai": { "binding": "AI" },
     }
   }
 }

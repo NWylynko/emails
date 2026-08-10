@@ -31,8 +31,8 @@ import { cache } from "react";
  * outside any fetch request, so `getCloudflareContext()` is unavailable there
  * and it must pass its own `env`.
  */
-export function createEmailsDbFromEnv(env: CloudflareEnv) {
-  const sql = postgres(env.HYPERDRIVE.connectionString, {
+export function createEmailsDbFromEnv(HYPERDRIVE: Hyperdrive) {
+  const sql = postgres(HYPERDRIVE.connectionString, {
     max: 5,
     fetch_types: false,
     prepare: false,
@@ -43,7 +43,7 @@ export function createEmailsDbFromEnv(env: CloudflareEnv) {
 
 /** Request-scoped client for pages, route handlers and server actions. */
 export const getEmailsDb = cache(() => {
-  const { env } = getCloudflareContext();
+  const cloudflare = getCloudflareContext();
 
-  return createEmailsDbFromEnv(env);
+  return createEmailsDbFromEnv(cloudflare.env.HYPERDRIVE);
 });
