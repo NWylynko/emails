@@ -77,8 +77,20 @@ forwards `x-forwarded-host: localhost`, and Next rejects Server Actions whose
 - **`assets` must be bound in `wrangler.jsonc`** (`.open-next/assets`). Without
   it the app serves HTML fine and every chunk, stylesheet and image 404s — which
   looks like a working app to a curl check.
-- **`turndown` hangs the Worker.** It needs a DOM shim that does not work on
-  workerd; `/email/[id]/html` never returns a response. Unresolved — see below.
+- **`turndown` hangs the Worker on *some* email HTML.** Not a general
+  incompatibility — `nodejs_compat` gives it what it needs and it converts most
+  emails in single-digit ms. But specific real-world email HTML sends it into a
+  non-terminating loop **under workerd only**. Measured against the dev database:
+
+  | email | plain Node 24 | workerd |
+  |-------|---------------|---------|
+  | 143 (7.8k) | 12ms | 3ms |
+  | 3003 (10.7k) | **6ms** | **hangs** |
+  | 3005 (17.9k) | 7ms | 22ms |
+
+  Content-dependent, not size-dependent, and identical input is fine in Node. Any
+  inbound email may carry HTML that hangs a request until the runtime kills it.
+  Do not put turndown on a server-side path in this Worker. Unresolved — see below.
 
 ## Types
 
@@ -131,9 +143,9 @@ Done:
 
 Not done:
 
-- `/email/[id]/html` hangs (turndown). Needs a Workers-compatible approach —
-  `HTMLRewriter` sanitising server-side, or moving the turndown pass into the
-  browser where a real DOM exists.
+- `/email/[id]/html` hangs on some emails (turndown under workerd, see above).
+  Options: move the turndown pass into the browser, where it demonstrably works;
+  or sanitise with `HTMLRewriter` server-side and render real HTML.
 - Still on the old externals: `@neondatabase/serverless` + `DATABASE_URL`,
   `@aws-sdk/*` presigned R2 URLs, Workers AI over REST with `CLOUDFLARE_AI_KEY`.
   All three should become bindings (`HYPERDRIVE`, `ATTACHMENTS`, `AI`).
