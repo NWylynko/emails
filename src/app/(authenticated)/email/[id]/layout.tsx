@@ -1,26 +1,11 @@
 import { TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { getEmailsDb } from "@/database";
-import { emails } from "@/database/schema";
-import * as driz from "drizzle-orm";
+import { getEmailHeader, markEmailViewed } from "@/email/emailQueries";
 import { ArrowLeftIcon } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { PropsWithChildren } from "react";
 import { PageTabs } from "./PageTabs";
-
-function getEmailHeader(id: number) {
-  return getEmailsDb()
-    .select({
-      to: emails.to,
-      from: emails.from,
-      subject: emails.subject,
-      viewed: emails.viewed,
-      timestamp: emails.timestamp,
-    })
-    .from(emails)
-    .where(driz.eq(emails.emailId, id));
-}
 
 export default async function EmailLayout(props: LayoutProps<"/email/[id]">) {
   await connection();
@@ -29,19 +14,14 @@ export default async function EmailLayout(props: LayoutProps<"/email/[id]">) {
 
   const id = Number(id_string);
 
-  const [email] = await getEmailHeader(id);
+  const email = await getEmailHeader(id);
 
-  if (email === undefined) {
+  if (email === null) {
     notFound();
   }
 
   if (email.viewed === false) {
-    await getEmailsDb()
-      .update(emails)
-      .set({
-        viewed: true,
-      })
-      .where(driz.eq(emails.emailId, id));
+    await markEmailViewed(id);
   }
 
   return (

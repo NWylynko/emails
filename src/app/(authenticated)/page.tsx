@@ -1,8 +1,6 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
-import { getEmailsDb } from "@/database";
-import { emails } from "@/database/schema";
-import * as driz from "drizzle-orm";
+import { listInboxesWithCounts } from "@/inbox/inboxQueries";
 import { connection } from "next/server";
 import { RefreshButton } from "@/components/RefreshButton";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -12,23 +10,6 @@ import { PushNotifications } from "@/components/PushNotifications";
 import { Button } from "@/components/ui/button";
 import { SignOutButton } from "@clerk/nextjs";
 import { GenerateBotToken } from "@/components/GenerateBotToken";
-
-function listInboxesWithCounts() {
-  const latestUnreadEmail = driz.max(emails.timestamp).as("latestUnreadEmail");
-
-  return getEmailsDb()
-    .select({
-      name: emails.to,
-      totalEmails: driz.count(emails.to),
-      unreadEmails: driz
-        .sum(driz.sql`CASE WHEN ${emails.viewed} = false THEN 1 ELSE 0 END`)
-        .as("unreadEmails"),
-      latestUnreadEmail,
-    })
-    .from(emails)
-    .groupBy(emails.to)
-    .orderBy(driz.desc(latestUnreadEmail));
-}
 
 export default async function Home(props: PageProps<"/">) {
   await connection();
@@ -61,8 +42,8 @@ export default async function Home(props: PageProps<"/">) {
       <div className="border-t border-b border-zinc-300">
         {inboxes.map((inbox, index) => (
           <Link
-            key={inbox.name}
-            href={`/inbox/${encodeURIComponent(inbox.name)}`}
+            key={inbox.to}
+            href={`/inbox/${encodeURIComponent(inbox.to)}`}
           >
             <div
               className={`flex items-center justify-between py-3 px-4 hover:bg-gray-100 ${
@@ -70,17 +51,17 @@ export default async function Home(props: PageProps<"/">) {
               }`}
             >
               <div className="flex items-center space-x-4">
-                <span className="font-medium">{inbox.name}</span>
-                {(inbox.unreadEmails ? Number(inbox.unreadEmails) : 0) > 0 ? (
+                <span className="font-medium">{inbox.to}</span>
+                {inbox.unread > 0 ? (
                   <Badge
                     variant="secondary"
                     className="bg-blue-100 text-blue-800"
                   >
-                    {inbox.unreadEmails}
+                    {inbox.unread}
                   </Badge>
                 ) : (
                   <span className="text-sm text-gray-500">
-                    {inbox.totalEmails}
+                    {inbox.total}
                   </span>
                 )}
               </div>

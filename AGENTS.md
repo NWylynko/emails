@@ -18,6 +18,9 @@ worker.ts            entry: wraps .open-next/worker.js, adds the email() handler
 src/                 Next.js App Router app (Clerk auth, Drizzle, R2, Workers AI)
 src/middleware.ts    Clerk gate — NOT proxy.ts, see below
 src/database/schema.ts   the single copy of the schema (was duplicated across two repos)
+src/inbox/inboxQueries.ts    inbox reads/writes, shared by the website and /v1
+src/email/emailQueries.ts    email/attachment reads, shared by the website and /v1
+src/app/v1/              the CLI API (Bearer token, not Clerk)
 cli/                 the Rust `emails` CLI (crate name `emails`, binary `emails`)
 scripts/generateCloudflareTypes.mjs   see "Types" below
 ```
@@ -134,6 +137,23 @@ Two things to get right when doing that:
   Routing retries a failed delivery, that would duplicate rows for all inbound
   mail. Keep it where it is.
 
+## The /v1 CLI API
+
+Route handlers under `src/app/v1/`, authorised by `src/api/authorizeApiToken.ts`
+(Bearer, timing-safe). Two halves of one decision, and breaking either is silent:
+`middleware.ts` lists `/v1` as public so Clerk does not redirect token requests,
+and `withApiToken` is what actually guards them.
+
+`PUT /v1/inboxes/:to` still accepts `silent` only. `receiver` remains
+website-only on purpose — that dropdown restricts it to addresses that have
+already mailed the inbox.
+
+Test it with the real CLI rather than curl:
+
+```bash
+EMAILS_API_URL=http://localhost:8788 EMAILS_API_TOKEN=<token> emails inboxes
+```
+
 ## Testing
 
 No test suite yet. Verification is `pnpm typecheck`, `pnpm cf:build`, and driving
@@ -173,6 +193,20 @@ Done:
 - Verified signed-in against the dev clone: inbox list, per-inbox list, text tab,
   HTML tab, AI tab (real summary, link preserved), and an attachment download
   that saved with the right filename. Zero server errors across the session.
+- **The `/v1` CLI API is now Next route handlers** under `src/app/v1/`, which
+  deleted the hand-rolled router (`matchInboxPath`, the regex dispatch, the JSON
+  helpers) from the old `api.ts`. Verified by running the real `emails` binary
+  against the local Worker with `EMAILS_API_URL=http://localhost:8788`:
+  `inboxes`, `list`, `get`, `attachment list`, `attachment get`, `inbox
+  mute/unmute` and `health` all behave, and a missing or wrong token gets 401
+  rather than a redirect.
+- **The inbox-list query exists once**, in `src/inbox/inboxQueries.ts`, used by
+  both the website and `/v1`.
+- **Oversized-part pointers resolve on every read path.** `readEmailBody` /
+  `readEmailHtml` in `src/email/emailQueries.ts` are the only sanctioned way to
+  read those columns. Verified by pointing email 3639's body at an R2 object and
+  confirming both `/v1/emails/3639` and the website's text tab render the R2
+  contents rather than the `r2:...` string.
 - **The inbound `email()` handler now lives in this Worker** (`worker.ts` ->
   `src/email/receiveEmail.ts`), with the notification pair de-duplicated into
   `src/notification/notifyAboutEmail.ts`. Driven end to end with a synthetic
@@ -185,10 +219,6 @@ Done:
 
 Not done:
 
-- The `/v1` CLI API is not yet ported into this Worker; `emails-cli` still talks
-  to the old `email-service` deployment.
-- The inbox-list query still exists twice (the website's and the API's), which
-  is one of the duplications the merge is meant to remove.
 - Secrets do not yet follow `~/SECRETS.md` (Infisical + varlock). This project
   still keeps real values in `.env.local` / `.dev.vars`. Deliberately deferred —
   revisit before this is treated as finished.
