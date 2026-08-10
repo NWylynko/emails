@@ -61,9 +61,28 @@ pnpm cf-typegen   # after changing wrangler.jsonc or .dev.vars
 loads `.env.local`, refuses to start if the local Hyperdrive string points at
 production, and pins the port to 8788.
 
-Secrets: `.env.local` (build time, gitignored) and `.dev.vars` (Worker runtime in
-`wrangler dev`, gitignored). Both are currently copies of the old
-`email-client/.env.local` plus the Hyperdrive local connection string.
+**There are no `.env` files with values, and there is no `.dev.vars`.** Secrets
+live in Infisical (project "emails", environments `dev` and `prod`) and are
+injected by the Infisical CLI; `.env.schema` is the committed, value-free schema
+that varlock validates against. See `~/SECRETS.md` for the model.
+
+Every script is already wrapped in `infisical run`, so there is nothing to
+remember — but if you invoke a build or the Worker directly, wrap it yourself or
+it will fail on missing values.
+
+Two things that are NOT in Infisical, on purpose:
+
+- `NEXT_PUBLIC_CLERK_SIGN_IN_URL` — a non-secret whose value is declared in
+  `.env.schema`. Being public it is inlined at build time, so the Worker never
+  needs it at runtime.
+- The Cloudflare bindings (`HYPERDRIVE`, `ATTACHMENTS`, `AI`, `ASSETS`), which
+  come from `wrangler.jsonc`.
+
+`wrangler dev` does not forward its own process environment into the Worker —
+that is what `.dev.vars` normally exists for. `scripts/devWorker.sh` therefore
+passes each var through with `--var`. The values are visible in `ps` while it
+runs; that is a deliberate trade, since the threat being defended against is a
+filesystem scrape and nothing is written to disk.
 
 **Browse `wrangler dev` on `http://localhost:8788`, not `127.0.0.1`.** Wrangler
 forwards `x-forwarded-host: localhost`, and Next rejects Server Actions whose
@@ -116,6 +135,27 @@ forwards `x-forwarded-host: localhost`, and Next rejects Server Actions whose
   downloads 404 against a fresh checkout even though the database row exists.
   Seed one to exercise the path:
   `npx wrangler r2 object put email-attachments/<r2Key> --file=x --local`
+
+## Secrets and types are linked
+
+`wrangler types` learns var names from `.dev.vars`, and there isn't one. So
+`pnpm cf-typegen` reads the names from `.env.schema` instead and emits
+`worker-env-vars.d.ts`, which declaration-merges into `CloudflareEnv`. Adding a
+variable therefore means: add it in Infisical (both environments), add it to
+`.env.schema`, run `pnpm cf-typegen`.
+
+**The built artifact is environment-specific.** The Clerk publishable key is
+inlined into client assets at build time, so a dev build carries dev Clerk keys.
+`pnpm deploy` always rebuilds under `--env=prod`, which is what keeps that
+correct — never deploy an artifact built with `pnpm cf:build`.
+
+varlock scans build output for leaked secret values and fails the build if it
+finds one. Two values legitimately reach the browser and are marked `@public` for
+that reason: `PUSHER_KEY` / `PUSHER_CLUSTER` (the browser subscribes with them)
+and `BEAMS_INSTANCE_ID` (the Beams SDK registers a device with it). All three are
+passed from server components as props rather than via `NEXT_PUBLIC_` prefixes,
+so they resolve at runtime. `PUSHER_SECRET` and `BEAMS_SECRET` are the actual
+secrets and never leave the Worker.
 
 ## Types
 
@@ -204,6 +244,10 @@ Done:
 - Verified signed-in against the dev clone: inbox list, per-inbox list, text tab,
   HTML tab, AI tab (real summary, link preserved), and an attachment download
   that saved with the right filename. Zero server errors across the session.
+- **Secrets follow `~/SECRETS.md`**: nothing on disk, values in Infisical,
+  `.env.schema` committed, varlock wired into Next and confirmed live by the
+  "loaded by varlock" banner. The seven Pusher/Beams/Techulus credentials that
+  were hardcoded in source are gone from the repo.
 - **The `/v1` CLI API is now Next route handlers** under `src/app/v1/`, which
   deleted the hand-rolled router (`matchInboxPath`, the regex dispatch, the JSON
   helpers) from the old `api.ts`. Verified by running the real `emails` binary
@@ -230,9 +274,10 @@ Done:
 
 Not done:
 
-- Secrets do not yet follow `~/SECRETS.md` (Infisical + varlock). This project
-  still keeps real values in `.env.local` / `.dev.vars`. Deliberately deferred —
-  revisit before this is treated as finished.
+- The Infisical -> Cloudflare Workers secret sync is not set up yet. Until it is,
+  the deployed Worker has no secrets. Set it up in the Infisical UI pointed at
+  the **prod** environment, and note that once it exists, `wrangler secret put`
+  must never be used again — the sync silently overwrites it.
 - The oversized-email-part pointer (`r2:oversized-email-part/...`) is still
   unresolved on every UI read path — `/email/[id]`, `/email/[id]/html` and
   `/email/[id]/ai` will render the pointer as literal text.

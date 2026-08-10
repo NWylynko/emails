@@ -4,14 +4,7 @@
  * new message lands, without polling.
  *
  * Signing is done by hand because the official pusher SDK is a Node library.
- *
- * NOTE: these credentials are hardcoded, as they were in the standalone
- * service. They belong in secrets — tracked in AGENTS.md under cleanups.
  */
-const PUSHER_APP_ID = "1942904";
-const PUSHER_KEY = "16f0a5d23fb65028d3ad";
-const PUSHER_SECRET = "8391da3f075bb2c89edf";
-const PUSHER_CLUSTER = "ap4";
 
 async function md5Hex(message: string) {
   const hashBuffer = await crypto.subtle.digest(
@@ -42,8 +35,8 @@ async function hmacSha256Hex(secret: string, message: string) {
     .join("");
 }
 
-export async function pusherUpdatePing() {
-  const urlPath = `/apps/${PUSHER_APP_ID}/events`;
+export async function pusherUpdatePing(env: CloudflareEnv) {
+  const urlPath = `/apps/${env.PUSHER_APP_ID}/events`;
 
   const requestBody = JSON.stringify({
     name: "update",
@@ -54,20 +47,20 @@ export async function pusherUpdatePing() {
   // The query string must be sorted and lowercase, and the string-to-sign is
   // built from it *before* URL encoding.
   const queryParams = new URLSearchParams({
-    auth_key: PUSHER_KEY,
+    auth_key: env.PUSHER_KEY,
     auth_timestamp: Math.floor(Date.now() / 1000).toString(),
     auth_version: "1.0",
     body_md5: await md5Hex(requestBody),
   });
 
   const authSignature = await hmacSha256Hex(
-    PUSHER_SECRET,
+    env.PUSHER_SECRET,
     `POST\n${urlPath}\n${queryParams.toString()}`
   );
   queryParams.append("auth_signature", authSignature);
 
   const response = await fetch(
-    `https://api-${PUSHER_CLUSTER}.pusher.com${urlPath}?${queryParams.toString()}`,
+    `https://api-${env.PUSHER_CLUSTER}.pusher.com${urlPath}?${queryParams.toString()}`,
     {
       method: "POST",
       headers: {

@@ -11,7 +11,17 @@ type Store = {
 
 const context = createContext<StoreApi<Store> | null>(null);
 
-export const UpdatesProvider = (props: { children: React.ReactNode }) => {
+/**
+ * Pusher's key and cluster arrive as props from the authenticated layout rather
+ * than from NEXT_PUBLIC_ variables. The layout is a server component, so it can
+ * read them at runtime — which keeps them out of the client bundle at build
+ * time and means they need no NEXT_PUBLIC_ prefix in Infisical.
+ */
+export const UpdatesProvider = (props: {
+  children: React.ReactNode;
+  pusherKey: string;
+  pusherCluster: string;
+}) => {
   const [store] = useState(() =>
     createStore<Store>()((set) => ({
       updates: 0,
@@ -20,8 +30,8 @@ export const UpdatesProvider = (props: { children: React.ReactNode }) => {
   );
 
   useEffect(() => {
-    const pusher = new Pusher("16f0a5d23fb65028d3ad", {
-      cluster: "ap4",
+    const pusher = new Pusher(props.pusherKey, {
+      cluster: props.pusherCluster,
     });
 
     const channel = pusher.subscribe("updates");
@@ -33,7 +43,7 @@ export const UpdatesProvider = (props: { children: React.ReactNode }) => {
     return () => {
       channel.unbind("update");
     };
-  }, []);
+  }, [props.pusherKey, props.pusherCluster]);
 
   return <context.Provider value={store}>{props.children}</context.Provider>;
 };

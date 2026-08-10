@@ -3,14 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "infisical run --env=dev -- next dev",
     "build": "next build",
-    "cf:build": "opennextjs-cloudflare build",
-    "preview": "opennextjs-cloudflare build && ./scripts/devWorker.sh",
-    "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "cf:build": "infisical run --env=dev -- opennextjs-cloudflare build",
+    "preview": "infisical run --env=dev -- sh -c 'opennextjs-cloudflare build && ./scripts/devWorker.sh'",
+    "dev:worker": "infisical run --env=dev -- ./scripts/devWorker.sh",
+    "deploy": "infisical run --env=prod -- sh -c 'opennextjs-cloudflare build && opennextjs-cloudflare deploy'",
     "typecheck": "tsc --noEmit",
-    "cf-typegen": "node scripts/generateCloudflareTypes.mjs",
-    "dev:worker": "./scripts/devWorker.sh"
+    "cf-typegen": "node scripts/generateCloudflareTypes.mjs"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.7.1",
@@ -60,9 +60,11 @@
     "@types/node": "^26.2.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
+    "@varlock/nextjs-integration": "^1.2.0",
     "postcss": "^8.5.26",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
+    "varlock": "^1.16.1",
     "wrangler": "^4.120.1"
   },
   "packageManager": "pnpm@10.19.0+sha512.c9fc7236e92adf5c8af42fd5bf1612df99c2ceb62f27047032f4720b33f8eacdde311865e91c411f2774f618d82f320808ecb51718bfa82c060c4ba7c76a32b8"

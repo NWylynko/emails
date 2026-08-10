@@ -6,13 +6,7 @@
  * service this pair was written out twice, once per branch of the email
  * handler, which is how they drifted.
  *
- * NOTE: credentials are hardcoded here exactly as they were in the standalone
- * service. They belong in secrets — tracked in AGENTS.md under cleanups.
  */
-const BEAMS_INSTANCE_ID = "656479b8-e3ae-4b4e-852f-4af9c65d27a8";
-const BEAMS_SECRET =
-  "0250A1A1D97163D69D9A3EF16410590FA17AD9D746154241B4B7F7C0E0EF9A52";
-const TECHULUS_API_KEY = "892dccac-d1ca-4ea4-8650-f77878e733a7";
 
 function emailUrl(emailId: number) {
   return `https://emails.wylynko.me/email/${emailId}`;
@@ -24,18 +18,19 @@ function emailUrl(emailId: number) {
  * delivery, which re-runs the INSERT and leaves duplicate rows.
  */
 async function sendToPusherBeams(
+  env: CloudflareEnv,
   emailId: number,
   title: string,
   body: string
 ) {
   try {
     const response = await fetch(
-      `https://${BEAMS_INSTANCE_ID}.pushnotifications.pusher.com/publish_api/v1/instances/${BEAMS_INSTANCE_ID}/publishes`,
+      `https://${env.BEAMS_INSTANCE_ID}.pushnotifications.pusher.com/publish_api/v1/instances/${env.BEAMS_INSTANCE_ID}/publishes`,
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${BEAMS_SECRET}`,
+          Authorization: `Bearer ${env.BEAMS_SECRET}`,
         },
         body: JSON.stringify({
           interests: ["emails"],
@@ -69,11 +64,16 @@ async function sendToPusherBeams(
  * Techulus outage fails the handler and Email Routing retries the delivery,
  * duplicating the row it already inserted.
  */
-async function sendToTechulus(emailId: number, title: string, body: string) {
+async function sendToTechulus(
+  env: CloudflareEnv,
+  emailId: number,
+  title: string,
+  body: string
+) {
   const response = await fetch("https://push.techulus.com/api/v1/notify", {
     method: "POST",
     headers: {
-      "x-api-key": TECHULUS_API_KEY,
+      "x-api-key": env.TECHULUS_API_KEY,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
@@ -94,10 +94,11 @@ async function sendToTechulus(emailId: number, title: string, body: string) {
 }
 
 export async function notifyAboutEmail(
+  env: CloudflareEnv,
   emailId: number,
   title: string,
   body: string
 ) {
-  await sendToPusherBeams(emailId, title, body);
-  await sendToTechulus(emailId, title, body);
+  await sendToPusherBeams(env, emailId, title, body);
+  await sendToTechulus(env, emailId, title, body);
 }

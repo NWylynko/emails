@@ -2,3 +2,8 @@ onlyBuiltDependencies:
   - '@clerk/shared'
   - esbuild
   - workerd
+
+# varlock's Next.js integration works by replacing Next's own env loader.
+# Required by @varlock/nextjs-integration; overrides are read from here.
+overrides:
+  "@next/env": "npm:@varlock/nextjs-integration"

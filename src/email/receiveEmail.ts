@@ -76,7 +76,7 @@ export async function receiveEmail(
     });
   }
 
-  await pusherUpdatePing();
+  await pusherUpdatePing(env);
 
   const [inbox] = await db
     .select({ silent: inboxes.silent, receiver: inboxes.receiver })
@@ -99,6 +99,7 @@ export async function receiveEmail(
   if (message.from !== PROXY_SENDER) {
     if (inbox?.silent !== true) {
       await notifyAboutEmail(
+        env,
         result.emailId,
         `New Email for ${message.to}`,
         email.subject ?? message.from
@@ -164,6 +165,7 @@ export async function receiveEmail(
   });
 
   await notifyAboutEmail(
+    env,
     result.emailId,
     `Email sent to ${inbox.receiver}`,
     `Email sent to ${inbox.receiver}`
