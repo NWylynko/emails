@@ -48,6 +48,7 @@ under `env.production`. Verified safety properties:
 
 ```bash
 pnpm preview      # build + run the Worker on localhost:8788  <- the real thing
+pnpm deploy       # build + opennextjs-cloudflare deploy
 pnpm dev:worker   # run the last build without rebuilding
 pnpm dev          # plain next dev; bindings via initOpenNextCloudflareForDev()
 pnpm cf:build
@@ -55,9 +56,10 @@ pnpm typecheck
 pnpm cf-typegen   # after changing wrangler.jsonc or .dev.vars
 ```
 
-`scripts/devWorker.sh` backs the two worker commands. It loads `.env.local`,
-refuses to start if the local Hyperdrive string points at production, and pins
-the port to 8788.
+`scripts/devWorker.sh` backs the two worker commands. It wraps the adapter's own
+`opennextjs-cloudflare preview` (rather than calling `wrangler dev` directly),
+loads `.env.local`, refuses to start if the local Hyperdrive string points at
+production, and pins the port to 8788.
 
 Secrets: `.env.local` (build time, gitignored) and `.dev.vars` (Worker runtime in
 `wrangler dev`, gitignored). Both are currently copies of the old
@@ -85,6 +87,15 @@ forwards `x-forwarded-host: localhost`, and Next rejects Server Actions whose
 - **`assets` must be bound in `wrangler.jsonc`** (`.open-next/assets`). Without
   it the app serves HTML fine and every chunk, stylesheet and image 404s — which
   looks like a working app to a curl check.
+- **Two compatibility flags are required**, not one: `nodejs_compat` *and*
+  `global_fetch_strictly_public`. Missing the second means a server-side
+  `fetch()` to a URL matching this Worker's own routes loops back internally
+  instead of going out to the public internet.
+- Keep `compatibility_date` roughly current with the installed workerd, or every
+  build prints a staleness warning.
+- `main` is `worker.ts`, not the adapter's default `.open-next/worker.js` — that
+  is the documented custom-worker override, and it is what allows `email()` to
+  live alongside `fetch`.
 - **Never build the database client at module scope.** Module scope outlives a
   request inside a Worker isolate, so request 2 touches promises created in
   request 1's context and workerd cancels it with "your Worker's code had hung

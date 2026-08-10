@@ -2,8 +2,8 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "emails",
   "main": "worker.ts",
-  "compatibility_date": "2025-03-25",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_date": "2026-08-04",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "workers_dev": true,
   "observability": { "enabled": true },
 
@@ -48,7 +48,7 @@
       "workers_dev": true,
       "observability": { "enabled": true },
       "placement": { "mode": "smart" },
-      "compatibility_flags": ["nodejs_compat"],
+      "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
       "assets": {
         "directory": ".open-next/assets",
         "binding": "ASSETS"
