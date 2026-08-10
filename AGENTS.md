@@ -14,7 +14,7 @@ done and what is not.
 ## Shape
 
 ```
-worker.ts            entry: wraps .open-next/worker.js, adds handlers Next can't host
+worker.ts            entry: wraps .open-next/worker.js, adds the email() handler
 src/                 Next.js App Router app (Clerk auth, Drizzle, R2, Workers AI)
 src/middleware.ts    Clerk gate — NOT proxy.ts, see below
 src/database/schema.ts   the single copy of the schema (was duplicated across two repos)
@@ -117,6 +117,23 @@ before a build. So a clean checkout could never typecheck.
 Note the runtime globals override the DOM lib, so `Response.json()` returns
 `unknown` rather than `any` in client components. Type the result.
 
+## The mail handler
+
+`receiveEmail()` is reachable only through Email Routing, so the way to exercise
+it is to construct a `ForwardableEmailMessage` yourself — `from`, `to`, `headers`
+and a `raw` ReadableStream over a MIME string — and call it with `env`. That is a
+genuinely end-to-end test: real mailparser, real R2, real INSERT.
+
+Two things to get right when doing that:
+
+- **Force the target inbox `silent: true` first**, or the run pages a real phone
+  through Pusher Beams and Techulus.
+- Resend is constructed lazily, inside the forward-on branch only. Its
+  constructor throws on a missing key, so building it eagerly makes every
+  ordinary delivery depend on a credential it never uses — and since Email
+  Routing retries a failed delivery, that would duplicate rows for all inbound
+  mail. Keep it where it is.
+
 ## Testing
 
 No test suite yet. Verification is `pnpm typecheck`, `pnpm cf:build`, and driving
@@ -156,6 +173,11 @@ Done:
 - Verified signed-in against the dev clone: inbox list, per-inbox list, text tab,
   HTML tab, AI tab (real summary, link preserved), and an attachment download
   that saved with the right filename. Zero server errors across the session.
+- **The inbound `email()` handler now lives in this Worker** (`worker.ts` ->
+  `src/email/receiveEmail.ts`), with the notification pair de-duplicated into
+  `src/notification/notifyAboutEmail.ts`. Driven end to end with a synthetic
+  multipart message against the dev database and local R2: parse, oversized-part
+  stash, INSERT, attachment upload and attachment row all verified.
 - Clerk works: `/` redirects signed-out, ticket sign-in lands on a rendered
   inbox list from the dev database.
 - `/`, `/inbox/<email>`, `/email/<id>` verified working under `wrangler dev`.
@@ -163,7 +185,13 @@ Done:
 
 Not done:
 
-- `email()` handler and the `/v1` CLI API are not yet ported into this Worker.
+- The `/v1` CLI API is not yet ported into this Worker; `emails-cli` still talks
+  to the old `email-service` deployment.
+- The inbox-list query still exists twice (the website's and the API's), which
+  is one of the duplications the merge is meant to remove.
+- Secrets do not yet follow `~/SECRETS.md` (Infisical + varlock). This project
+  still keeps real values in `.env.local` / `.dev.vars`. Deliberately deferred —
+  revisit before this is treated as finished.
 - The oversized-email-part pointer (`r2:oversized-email-part/...`) is still
   unresolved on every UI read path — `/email/[id]`, `/email/[id]/html` and
   `/email/[id]/ai` will render the pointer as literal text.

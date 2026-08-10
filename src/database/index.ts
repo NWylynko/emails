@@ -26,9 +26,12 @@ import { cache } from "react";
  * native companion, which OpenNext's bundler cannot resolve through pnpm's
  * layout even when it is installed.
  */
-export const getEmailsDb = cache(() => {
-  const { env } = getCloudflareContext();
-
+/**
+ * Builds a client from an env directly. The inbound `email()` handler runs
+ * outside any fetch request, so `getCloudflareContext()` is unavailable there
+ * and it must pass its own `env`.
+ */
+export function createEmailsDbFromEnv(env: CloudflareEnv) {
   const sql = postgres(env.HYPERDRIVE.connectionString, {
     max: 5,
     fetch_types: false,
@@ -36,4 +39,11 @@ export const getEmailsDb = cache(() => {
   });
 
   return drizzle(sql);
+}
+
+/** Request-scoped client for pages, route handlers and server actions. */
+export const getEmailsDb = cache(() => {
+  const { env } = getCloudflareContext();
+
+  return createEmailsDbFromEnv(env);
 });
