@@ -38,4 +38,6 @@ case "$CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE" in
     ;;
 esac
 
-exec npx wrangler dev --port "${PORT:-8788}" "$@"
+# `opennextjs-cloudflare preview` is the adapter's own wrapper around
+# `wrangler dev`; args after `--` are passed through to wrangler.
+exec npx opennextjs-cloudflare preview -- --port "${PORT:-8788}" "$@"
