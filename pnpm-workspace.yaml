@@ -2,6 +2,9 @@ onlyBuiltDependencies:
   - '@clerk/shared'
   - esbuild
   - workerd
+  # Fetches the platform binary in a preinstall hook. Must be allow-listed or
+  # the hook is skipped and node_modules/.bin/infisical is never created.
+  - '@infisical/cli'
 
 # varlock's Next.js integration works by replacing Next's own env loader.
 # Required by @varlock/nextjs-integration; overrides are read from here.
