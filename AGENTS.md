@@ -27,23 +27,31 @@ scripts/generateCloudflareTypes.mjs   see "Types" below
 
 ## Deploying
 
-`pnpm deploy` builds under `infisical run --env=prod` and deploys with
-`--env production`. The build must happen under prod values because the Clerk
-publishable key is inlined into client assets — a dev-built artifact carries dev
-Clerk keys.
+**Deploys happen in CI only.** There is deliberately no `pnpm deploy` script —
+deploying from a laptop is how a dev-built artifact ends up in production, and
+the build must run under prod values because the Clerk publishable key is
+inlined into client assets.
 
-Two Workers, deliberately named differently:
+Cloudflare Workers Builds settings:
 
-| command | Worker | database |
-|---------|--------|----------|
-| `pnpm deploy` | `emails` | ep-purple-bread (**production**) |
-| `pnpm deploy:dev` | `emails-dev` | ep-flat-king (clone) |
+| field | value |
+|-------|-------|
+| Build command | `pnpm ci:build` |
+| Deploy command | `npx wrangler deploy --env production` |
 
-The top-level wrangler config is the dev one and is named `emails-dev`, so a
-bare `wrangler deploy` cannot overwrite production with dev bindings. That
-mistake would point the live Worker at the clone and silently write inbound mail
-into it, which is why the names differ rather than relying on remembering
-`--env production`.
+`--env production` is not optional. Without it CI publishes `emails-dev`, which
+is bound to the clone, and the `emails` Worker never receives the build. The two
+wrangler configs are named differently precisely so that mistake is visible
+rather than silently pointing the live Worker at the clone.
+
+`pnpm ci:build` runs `scripts/ciBuild.sh`: it authenticates a machine identity
+with `INFISICAL_CLIENT_ID` / `INFISICAL_CLIENT_SECRET` (set as build secrets in
+the Cloudflare dashboard) and runs the build under `infisical run --env=prod`.
+
+The Infisical CLI is a devDependency, so `pnpm install` provides it — but it
+ships its binary via a preinstall hook, so `@infisical/cli` must stay listed
+under `onlyBuiltDependencies` in `pnpm-workspace.yaml`. Remove it there and pnpm
+silently skips the hook, leaving no binary and a failing build.
 
 ### Build time and runtime need separate wiring
 
