@@ -26,9 +26,13 @@
       "@/*": [
         "./src/*"
       ]
-    }
+    },
+    "types": [
+      "./worker-configuration.d.ts", "node"
+    ]
   },
   "include": [
+    "worker-configuration.d.ts",
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
@@ -39,6 +43,6 @@
     "node_modules",
     "cli",
     ".open-next",
-    "worker.ts"
+    "./worker.ts"
   ]
 }

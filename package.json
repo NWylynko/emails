@@ -3,14 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "infisical run --env=dev -- next dev",
-    "build": "next build",
-    "cf:build": "infisical run --env=dev -- opennextjs-cloudflare build",
-    "preview": "infisical run --env=dev -- sh -c 'opennextjs-cloudflare build && ./scripts/devWorker.sh'",
-    "dev:worker": "infisical run --env=dev -- ./scripts/devWorker.sh",
-    "typecheck": "tsc --noEmit",
-    "cf-typegen": "node scripts/generateCloudflareTypes.mjs",
-    "ci:build": "./scripts/ciBuild.sh"
+    "dev": "infisical run --env=dev -- wrangler dev --env=development",
+    "build": "infisical run --env=prod -- next build",
+    "start": "infisical run --env=prod -- next start",
+    "ci:build": "opennextjs-cloudflare build --env=production",
+    "typecheck": "infisical run --env=dev -- next typegen && pnpm generate-types && tsc --noEmit",
+    "generate-types": "wrangler types --env-interface CloudflareEnv --env=development"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.7.1",
