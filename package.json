@@ -6,14 +6,13 @@
     "dev": "next dev",
     "build": "next build",
     "cf:build": "opennextjs-cloudflare build",
-    "preview": "opennextjs-cloudflare build && wrangler dev",
+    "preview": "opennextjs-cloudflare build && ./scripts/devWorker.sh",
     "deploy": "opennextjs-cloudflare build && wrangler deploy",
     "typecheck": "tsc --noEmit",
-    "cf-typegen": "node scripts/generateCloudflareTypes.mjs"
+    "cf-typegen": "node scripts/generateCloudflareTypes.mjs",
+    "dev:worker": "./scripts/devWorker.sh"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1106.0",
-    "@aws-sdk/s3-request-presigner": "^3.1106.0",
     "@clerk/nextjs": "^7.7.1",
     "@hookform/resolvers": "^5.7.1",
     "@neondatabase/serverless": "^1.1.0",

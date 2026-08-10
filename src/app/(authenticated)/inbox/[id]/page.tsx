@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, CogIcon } from "lucide-react";
-import { db } from "@/database";
+import { getEmailsDb } from "@/database";
 import { emails, inboxes } from "@/database/schema";
 import * as driz from "drizzle-orm";
 import { formatDistanceToNow } from "date-fns";
@@ -27,38 +27,37 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-const emailsQuery = db
-  .select({
-    emailId: emails.emailId,
-    from: emails.from,
-    to: emails.to,
-    subject: emails.subject,
-    timestamp: emails.timestamp,
-    viewed: emails.viewed,
-  })
-  .from(emails)
-  .where(driz.eq(emails.to, driz.sql.placeholder("inboxEmail")))
-  .orderBy(driz.desc(emails.timestamp))
-  .prepare("emailsQuery");
+function listInboxEmails(inboxEmail: string) {
+  return getEmailsDb()
+    .select({
+      emailId: emails.emailId,
+      from: emails.from,
+      to: emails.to,
+      subject: emails.subject,
+      timestamp: emails.timestamp,
+      viewed: emails.viewed,
+    })
+    .from(emails)
+    .where(driz.eq(emails.to, inboxEmail))
+    .orderBy(driz.desc(emails.timestamp));
+}
 
-const inboxQuery = db
-  .select({
-    silent: inboxes.silent,
-    receiver: inboxes.receiver,
-  })
-  .from(inboxes)
-  .where(driz.eq(inboxes.inbox, driz.sql.placeholder("inboxEmail")))
-  .prepare("inboxQuery");
+function listInboxSenders(inboxEmail: string) {
+  return getEmailsDb()
+    .selectDistinct({ from: emails.from })
+    .from(emails)
+    .where(driz.eq(emails.to, inboxEmail));
+}
 
-const distinctSendersQuery = db
-  .selectDistinct({ from: emails.from })
-  .from(emails)
-  .where(driz.eq(emails.to, driz.sql.placeholder("inboxEmail")))
-  .prepare("distinctSendersQuery");
-
-async function getIndex(inboxEmail: string) {
+async function getInboxSettings(inboxEmail: string) {
   try {
-    const [inbox] = await inboxQuery.execute({ inboxEmail });
+    const [inbox] = await getEmailsDb()
+      .select({
+        silent: inboxes.silent,
+        receiver: inboxes.receiver,
+      })
+      .from(inboxes)
+      .where(driz.eq(inboxes.inbox, inboxEmail));
 
     return inbox;
   } catch (error) {
@@ -72,10 +71,10 @@ export default async function InboxPage(props: PageProps<"/inbox/[id]">) {
 
   const inboxEmail = decodeURIComponent(id);
 
-  const results = await emailsQuery.execute({ inboxEmail });
-  const inbox = await getIndex(inboxEmail);
+  const results = await listInboxEmails(inboxEmail);
+  const inbox = await getInboxSettings(inboxEmail);
 
-  const distinctSenders = await distinctSendersQuery.execute({ inboxEmail });
+  const distinctSenders = await listInboxSenders(inboxEmail);
 
   return (
     <div className="space-y-4">
@@ -102,7 +101,7 @@ export default async function InboxPage(props: PageProps<"/inbox/[id]">) {
                   onCheckedChange={async (silent) => {
                     "use server";
 
-                    await db
+                    await getEmailsDb()
                       .insert(inboxes)
                       .values({
                         inbox: inboxEmail,
@@ -128,7 +127,7 @@ export default async function InboxPage(props: PageProps<"/inbox/[id]">) {
                   onValueChange={async (value) => {
                     "use server";
 
-                    await db
+                    await getEmailsDb()
                       .insert(inboxes)
                       .values({
                         inbox: inboxEmail,

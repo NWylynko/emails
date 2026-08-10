@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
-import { db } from "@/database";
+import { getEmailsDb } from "@/database";
 import { emails } from "@/database/schema";
 import * as driz from "drizzle-orm";
 import { connection } from "next/server";
@@ -13,26 +13,27 @@ import { Button } from "@/components/ui/button";
 import { SignOutButton } from "@clerk/nextjs";
 import { GenerateBotToken } from "@/components/GenerateBotToken";
 
-const latestUnreadEmail = driz.max(emails.timestamp).as("latestUnreadEmail");
+function listInboxesWithCounts() {
+  const latestUnreadEmail = driz.max(emails.timestamp).as("latestUnreadEmail");
 
-const inboxesQuery = db
-  .select({
-    name: emails.to,
-    totalEmails: driz.count(emails.to),
-    unreadEmails: driz
-      .sum(driz.sql`CASE WHEN ${emails.viewed} = false THEN 1 ELSE 0 END`)
-      .as("unreadEmails"),
-    latestUnreadEmail,
-  })
-  .from(emails)
-  .groupBy(emails.to)
-  .orderBy(driz.desc(latestUnreadEmail))
-  .prepare("inboxesQuery");
+  return getEmailsDb()
+    .select({
+      name: emails.to,
+      totalEmails: driz.count(emails.to),
+      unreadEmails: driz
+        .sum(driz.sql`CASE WHEN ${emails.viewed} = false THEN 1 ELSE 0 END`)
+        .as("unreadEmails"),
+      latestUnreadEmail,
+    })
+    .from(emails)
+    .groupBy(emails.to)
+    .orderBy(driz.desc(latestUnreadEmail));
+}
 
 export default async function Home(props: PageProps<"/">) {
   await connection();
 
-  const inboxes = await inboxesQuery.execute();
+  const inboxes = await listInboxesWithCounts();
 
   return (
     <div className="space-y-4">

@@ -1,4 +1,5 @@
-import { db } from "@/database";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { getEmailsDb } from "@/database";
 import { emails } from "@/database/schema";
 import * as driz from "drizzle-orm";
 import { notFound } from "next/navigation";
@@ -11,67 +12,52 @@ import { linkifyText } from "../linkifyText";
 // https://developers.cloudflare.com/workers-ai/models/ for current models.
 const emailSummaryModel = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 
-type CloudflareAIResponse = {
-  result?: {
+/**
+ * Runs through the `AI` binding rather than the REST API, which drops the
+ * account id and the `CLOUDFLARE_AI_KEY` secret from the project.
+ *
+ * The binding still needs the same defensive check: a retired model does not
+ * throw, it comes back without a `response` string.
+ */
+async function runEmailSummaryModel(model: string, input: object) {
+  const { env } = getCloudflareContext();
+
+  const result = (await env.AI.run(model as never, input as never)) as {
     response?: string;
-    usage?: {
-      prompt_tokens: number;
-      completion_tokens: number;
-      total_tokens: number;
-    };
   };
-  success: boolean;
-  errors: { code: number; message: string }[];
-  messages: string[];
-};
 
-async function runAIModel(model: string, input: object) {
-  const response = await fetch(
-    `https://api.cloudflare.com/client/v4/accounts/004b3c7f616265030549ffe5381eff06/ai/run/${model}`,
-    {
-      headers: { Authorization: `Bearer ${process.env.CLOUDFLARE_AI_KEY}` },
-      method: "POST",
-      body: JSON.stringify(input),
-    }
-  );
-
-  const body = (await response.json()) as CloudflareAIResponse;
-
-  // Surface the reason rather than letting an absent `result` become a
-  // "Cannot read properties of undefined" further down the page.
-  if (body.success === false || typeof body.result?.response !== "string") {
-    const reason =
-      body.errors?.map((error) => `${error.code}: ${error.message}`).join("; ") ||
-      `unexpected response shape: ${JSON.stringify(body).slice(0, 500)}`;
-
+  if (typeof result?.response !== "string") {
     throw new Error(
-      `Cloudflare AI call failed for model ${model} (HTTP ${response.status}) — ${reason}`
+      `Workers AI returned no response for model ${model} — ` +
+        `${JSON.stringify(result).slice(0, 500)}. The model may have been ` +
+        `retired; see https://developers.cloudflare.com/workers-ai/models/`
     );
   }
 
-  return body.result.response;
+  return result.response;
 }
 
-const emailQuery = db
-  .select({
-    body: emails.body,
-  })
-  .from(emails)
-  .where(driz.eq(emails.emailId, driz.sql.placeholder("id")))
-  .prepare("emailQueryForAI");
+function getEmailBodyForSummary(id: number) {
+  return getEmailsDb()
+    .select({
+      body: emails.body,
+    })
+    .from(emails)
+    .where(driz.eq(emails.emailId, id));
+}
 
 export default async function AiEmailPage(props: PageProps<"/email/[id]/ai">) {
   await connection();
 
   const { id } = await props.params;
 
-  const [email] = await emailQuery.execute({ id });
+  const [email] = await getEmailBodyForSummary(Number(id));
 
   if (email === undefined) {
     notFound();
   }
 
-  const summary = await runAIModel(emailSummaryModel, {
+  const summary = await runEmailSummaryModel(emailSummaryModel, {
     messages: [
       {
         role: "system",
