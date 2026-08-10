@@ -8,9 +8,10 @@
     "cf:build": "infisical run --env=dev -- opennextjs-cloudflare build",
     "preview": "infisical run --env=dev -- sh -c 'opennextjs-cloudflare build && ./scripts/devWorker.sh'",
     "dev:worker": "infisical run --env=dev -- ./scripts/devWorker.sh",
-    "deploy": "infisical run --env=prod -- sh -c 'opennextjs-cloudflare build && opennextjs-cloudflare deploy'",
+    "deploy": "infisical run --env=prod -- sh -c 'opennextjs-cloudflare build && opennextjs-cloudflare deploy -- --env production'",
     "typecheck": "tsc --noEmit",
-    "cf-typegen": "node scripts/generateCloudflareTypes.mjs"
+    "cf-typegen": "node scripts/generateCloudflareTypes.mjs",
+    "deploy:dev": "infisical run --env=dev -- sh -c 'opennextjs-cloudflare build && opennextjs-cloudflare deploy'"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.7.1",
