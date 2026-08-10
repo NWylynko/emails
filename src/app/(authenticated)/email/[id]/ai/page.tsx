@@ -1,7 +1,5 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
-import { getEmailsDb } from "@/database";
-import { emails } from "@/database/schema";
-import * as driz from "drizzle-orm";
+import { readEmailBody } from "@/email/emailQueries";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { linkifyText } from "../linkifyText";
@@ -37,23 +35,14 @@ async function runEmailSummaryModel(model: string, input: object) {
   return result.response;
 }
 
-function getEmailBodyForSummary(id: number) {
-  return getEmailsDb()
-    .select({
-      body: emails.body,
-    })
-    .from(emails)
-    .where(driz.eq(emails.emailId, id));
-}
-
 export default async function AiEmailPage(props: PageProps<"/email/[id]/ai">) {
   await connection();
 
   const { id } = await props.params;
 
-  const [email] = await getEmailBodyForSummary(Number(id));
+  const body = await readEmailBody(Number(id));
 
-  if (email === undefined) {
+  if (body === null) {
     notFound();
   }
 
@@ -66,7 +55,7 @@ export default async function AiEmailPage(props: PageProps<"/email/[id]/ai">) {
       },
       {
         role: "user",
-        content: email.body,
+        content: body,
       },
       {
         role: "user",

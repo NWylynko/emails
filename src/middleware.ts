@@ -1,7 +1,17 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
-const isPublicRoute = createRouteMatcher(["/sign-in(.*)", "/authenticate(.*)"]);
+/**
+ * `/v1` is public *to Clerk* only — it carries its own Bearer-token check in
+ * `src/api/authorizeApiToken.ts`. emails-cli sends a token, not a session
+ * cookie, so leaving it behind the Clerk gate turns every CLI call into a 307
+ * to /sign-in.
+ */
+const isPublicRoute = createRouteMatcher([
+  "/sign-in(.*)",
+  "/authenticate(.*)",
+  "/v1(.*)",
+]);
 
 const allowedUserIds = Object.freeze([
   "user_2t6gJSoy2au2IcsGdNGFt32ZyQL",

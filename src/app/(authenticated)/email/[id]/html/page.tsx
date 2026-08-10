@@ -1,37 +1,22 @@
-import { getEmailsDb } from "@/database";
-import { emails } from "@/database/schema";
-import * as driz from "drizzle-orm";
+import { readEmailHtml } from "@/email/emailQueries";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { emailHtmlToMarkdown } from "@/email/emailHtmlToMarkdown";
 
-function getEmailHtml(id: number) {
-  return getEmailsDb()
-    .select({
-      html: emails.html,
-    })
-    .from(emails)
-    .where(driz.eq(emails.emailId, id));
-}
-
 export default async function EmailPage(props: PageProps<"/email/[id]/html">) {
   await connection();
 
   const { id } = await props.params;
 
-  const [email] = await getEmailHtml(Number(id));
+  const html = await readEmailHtml(Number(id));
 
-  if (email === undefined) {
-    notFound();
-  }
-
-  if (email.html === null) {
+  if (html === null) {
     return <div>No HTML body</div>;
   }
 
-  const markdown = await emailHtmlToMarkdown(email.html);
+  const markdown = await emailHtmlToMarkdown(html);
 
   return (
     <ReactMarkdown

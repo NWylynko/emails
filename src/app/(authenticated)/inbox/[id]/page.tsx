@@ -1,9 +1,13 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, CogIcon } from "lucide-react";
-import { getEmailsDb } from "@/database";
-import { emails, inboxes } from "@/database/schema";
-import * as driz from "drizzle-orm";
+import {
+  getInboxSettings,
+  listInboxEmails,
+  listInboxSenders,
+  setInboxReceiver,
+  setInboxSilent,
+} from "@/inbox/inboxQueries";
 import { formatDistanceToNow } from "date-fns";
 import { connection } from "next/server";
 import { RefreshButton } from "@/components/RefreshButton";
@@ -26,44 +30,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
-function listInboxEmails(inboxEmail: string) {
-  return getEmailsDb()
-    .select({
-      emailId: emails.emailId,
-      from: emails.from,
-      to: emails.to,
-      subject: emails.subject,
-      timestamp: emails.timestamp,
-      viewed: emails.viewed,
-    })
-    .from(emails)
-    .where(driz.eq(emails.to, inboxEmail))
-    .orderBy(driz.desc(emails.timestamp));
-}
-
-function listInboxSenders(inboxEmail: string) {
-  return getEmailsDb()
-    .selectDistinct({ from: emails.from })
-    .from(emails)
-    .where(driz.eq(emails.to, inboxEmail));
-}
-
-async function getInboxSettings(inboxEmail: string) {
-  try {
-    const [inbox] = await getEmailsDb()
-      .select({
-        silent: inboxes.silent,
-        receiver: inboxes.receiver,
-      })
-      .from(inboxes)
-      .where(driz.eq(inboxes.inbox, inboxEmail));
-
-    return inbox;
-  } catch (error) {
-    return null;
-  }
-}
 
 export default async function InboxPage(props: PageProps<"/inbox/[id]">) {
   await connection();
@@ -101,19 +67,7 @@ export default async function InboxPage(props: PageProps<"/inbox/[id]">) {
                   onCheckedChange={async (silent) => {
                     "use server";
 
-                    await getEmailsDb()
-                      .insert(inboxes)
-                      .values({
-                        inbox: inboxEmail,
-                        silent,
-                      })
-                      .onConflictDoUpdate({
-                        target: inboxes.inbox,
-                        set: {
-                          silent,
-                        },
-                        setWhere: driz.eq(inboxes.inbox, inboxEmail),
-                      });
+                    await setInboxSilent(inboxEmail, silent);
 
                     revalidatePath(`/inbox/${id}`);
                   }}
@@ -127,16 +81,7 @@ export default async function InboxPage(props: PageProps<"/inbox/[id]">) {
                   onValueChange={async (value) => {
                     "use server";
 
-                    await getEmailsDb()
-                      .insert(inboxes)
-                      .values({
-                        inbox: inboxEmail,
-                        receiver: value,
-                      })
-                      .onConflictDoUpdate({
-                        target: inboxes.inbox,
-                        set: { receiver: value },
-                      });
+                    await setInboxReceiver(inboxEmail, value);
 
                     revalidatePath(`/inbox/${id}`);
                   }}
