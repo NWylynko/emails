@@ -44,12 +44,17 @@ under `env.production`. Verified safety properties:
 ## Running it
 
 ```bash
-pnpm cf:build     # opennextjs-cloudflare build
-pnpm preview      # cf:build + wrangler dev  (Workers runtime, port 8787 by default)
-pnpm dev          # plain next dev; bindings come via initOpenNextCloudflareForDev()
+pnpm preview      # build + run the Worker on localhost:8788  <- the real thing
+pnpm dev:worker   # run the last build without rebuilding
+pnpm dev          # plain next dev; bindings via initOpenNextCloudflareForDev()
+pnpm cf:build
 pnpm typecheck
 pnpm cf-typegen   # after changing wrangler.jsonc or .dev.vars
 ```
+
+`scripts/devWorker.sh` backs the two worker commands. It loads `.env.local`,
+refuses to start if the local Hyperdrive string points at production, and pins
+the port to 8788.
 
 Secrets: `.env.local` (build time, gitignored) and `.dev.vars` (Worker runtime in
 `wrangler dev`, gitignored). Both are currently copies of the old
@@ -77,21 +82,26 @@ forwards `x-forwarded-host: localhost`, and Next rejects Server Actions whose
 - **`assets` must be bound in `wrangler.jsonc`** (`.open-next/assets`). Without
   it the app serves HTML fine and every chunk, stylesheet and image 404s — which
   looks like a working app to a curl check.
-- **A module-scope database client breaks every second request.**
-  `src/database/index.ts` builds an `@neondatabase/serverless` client at module
-  scope. Module scope persists across requests in a Worker isolate, so request 2
-  reuses a promise created in request 1's context and workerd cancels it with
-  "your Worker's code had hung and would never generate a response" — instantly,
-  in ~10ms, despite the wording. Six consecutive requests to the same route:
+- **Never build the database client at module scope.** Module scope outlives a
+  request inside a Worker isolate, so request 2 touches promises created in
+  request 1's context and workerd cancels it with "your Worker's code had hung
+  and would never generate a response" — instantly, in ~10ms, despite the
+  wording. It failed on exactly every other request:
 
-  | driver | result |
-  |--------|--------|
+  | driver | six consecutive requests |
+  |--------|--------------------------|
   | module-scope `@neondatabase/serverless` | 200, 500, 200, 500, 200, 500 |
   | per-request Hyperdrive + postgres.js | 200 × 6 |
 
-  **Build the client per request** from `getCloudflareContext().env.HYPERDRIVE`.
-  This is easy to misdiagnose: alternating failures over a list of different
-  inputs read exactly like "these particular records are broken". They are not.
+  Fixed: `getEmailsDb()` in `src/database/index.ts` is wrapped in React
+  `cache()`, so one client is shared within a request and never across requests.
+  Easy to misdiagnose — alternating failures over a list of different inputs read
+  exactly like "these particular records are broken". They are not.
+
+- **The R2 bucket in `wrangler dev` is local and empty**, so attachment
+  downloads 404 against a fresh checkout even though the database row exists.
+  Seed one to exercise the path:
+  `npx wrangler r2 object put email-attachments/<r2Key> --file=x --local`
 
 ## Types
 
@@ -136,7 +146,16 @@ Don't leave the AI tab in a refresh loop.
 
 Done:
 
-- Next 16 app builds and runs on workerd via OpenNext (2.15 MiB gzip, limit 10).
+- Next 16 app builds and runs on workerd via OpenNext (1.87 MiB gzip, limit 10).
+- **Phase 2 complete — all three external services are now bindings.** Gone from
+  the project: `@neondatabase/serverless`, `@aws-sdk/client-s3`,
+  `@aws-sdk/s3-request-presigner`, `turndown`, and the `DATABASE_URL`,
+  `CLOUDFLARE_R2_*` and `CLOUDFLARE_AI_KEY` variables. Attachments stream from
+  the `ATTACHMENTS` binding via `/attachment/[id]`; summaries run on the `AI`
+  binding; queries go through Hyperdrive.
+- Verified signed-in against the dev clone: inbox list, per-inbox list, text tab,
+  HTML tab, AI tab (real summary, link preserved), and an attachment download
+  that saved with the right filename. Zero server errors across the session.
 - Clerk works: `/` redirects signed-out, ticket sign-in lands on a rendered
   inbox list from the dev database.
 - `/`, `/inbox/<email>`, `/email/<id>` verified working under `wrangler dev`.
@@ -144,11 +163,6 @@ Done:
 
 Not done:
 
-- Every DB-backed page still fails on alternate requests until the module-scope
-  neon client is replaced (see above). This is the next thing to fix.
-- Still on the old externals: `@neondatabase/serverless` + `DATABASE_URL`,
-  `@aws-sdk/*` presigned R2 URLs, Workers AI over REST with `CLOUDFLARE_AI_KEY`.
-  All three should become bindings (`HYPERDRIVE`, `ATTACHMENTS`, `AI`).
 - `email()` handler and the `/v1` CLI API are not yet ported into this Worker.
 - The oversized-email-part pointer (`r2:oversized-email-part/...`) is still
   unresolved on every UI read path — `/email/[id]`, `/email/[id]/html` and

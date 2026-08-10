@@ -6,21 +6,22 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { db } from "@/database";
+import { getEmailsDb } from "@/database";
 import { attachments } from "@/database/schema";
 import * as driz from "drizzle-orm";
 import { AttachmentDownload } from "./AttachmentDownload";
 
-const emailAttachmentsQuery = db
-  .select({
-    attachmentId: attachments.attachmentId,
-    name: attachments.name,
-    size: attachments.size,
-    contentType: attachments.contentType,
-  })
-  .from(attachments)
-  .where(driz.eq(attachments.emailId, driz.sql.placeholder("emailId")))
-  .prepare("emailAttachmentsQuery");
+function listEmailAttachments(emailId: number) {
+  return getEmailsDb()
+    .select({
+      attachmentId: attachments.attachmentId,
+      name: attachments.name,
+      size: attachments.size,
+      contentType: attachments.contentType,
+    })
+    .from(attachments)
+    .where(driz.eq(attachments.emailId, emailId));
+}
 
 const SIZE_UNITS = ["B", "KB", "MB", "GB", "TB", "PB"] as const;
 
@@ -51,9 +52,7 @@ function formatBytes(value: number | null) {
 }
 
 export async function Attachments(props: { emailId: number }) {
-  const items = await emailAttachmentsQuery.execute({
-    emailId: props.emailId,
-  });
+  const items = await listEmailAttachments(props.emailId);
 
   if (items.length === 0) {
     return <></>;
@@ -76,7 +75,10 @@ export async function Attachments(props: { emailId: number }) {
             <TableCell>{formatBytes(attachment.size)}</TableCell>
             <TableCell>{attachment.contentType}</TableCell>
             <TableCell>
-              <AttachmentDownload attachmentId={attachment.attachmentId} />
+              <AttachmentDownload
+                attachmentId={attachment.attachmentId}
+                filename={attachment.name}
+              />
             </TableCell>
           </TableRow>
         ))}

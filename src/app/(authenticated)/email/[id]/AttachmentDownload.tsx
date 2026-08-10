@@ -2,18 +2,19 @@
 
 import { Button } from "@/components/ui/button";
 import { DownloadIcon, Loader2Icon } from "lucide-react";
-import { getAttachmentUrl } from "./Attachment-actions";
 import { useState } from "react";
 import { toast } from "sonner";
 
-export function AttachmentDownload(props: { attachmentId: number }) {
+export function AttachmentDownload(props: {
+  attachmentId: number;
+  filename: string | null;
+}) {
   const [loading, setLoading] = useState(false);
 
   const handleClick = async () => {
     setLoading(true);
     try {
-      const { url, filename } = await getAttachmentUrl(props.attachmentId);
-      await downloadFile(url, filename);
+      await downloadAttachment(props.attachmentId, props.filename);
     } catch (error) {
       console.error(error);
       toast.error("Failed to download attachment");
@@ -39,12 +40,16 @@ export function AttachmentDownload(props: { attachmentId: number }) {
   );
 }
 
-async function downloadFile(fileUrl: string, filename: string | null) {
-  const res = await fetch(fileUrl);
+async function downloadAttachment(
+  attachmentId: number,
+  filename: string | null
+) {
+  const res = await fetch(`/attachment/${attachmentId}`);
 
   if (!res.ok) {
-    console.error("Download failed", res.status);
-    return;
+    throw new Error(
+      `Attachment download failed: ${res.status} ${res.statusText}`
+    );
   }
 
   const blob = await res.blob();
