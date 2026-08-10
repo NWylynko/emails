@@ -1,0 +1,71 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "emails",
+  "main": "worker.ts",
+  "compatibility_date": "2025-03-25",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "observability": { "enabled": true },
+
+  // Next's static output (/_next/static, public/). Without this the app serves
+  // HTML but every chunk, stylesheet and image 404s.
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+
+  /**
+   * Hyperdrive -> Neon.
+   *
+   * `id` is the DEV config (neon-email-database-dev -> ep-flat-king), which is a
+   * clone and safe to develop against. Production is a different config
+   * (neon-email-database -> ep-purple-bread, 3c425a8db80648cc9b5049a3d709421e)
+   * and is wired up per-environment below, so a plain `wrangler dev` can never
+   * reach it.
+   *
+   * NOTE: `wrangler dev --remote` uses the DEPLOYED Hyperdrive config. Do not
+   * use that flag on this project.
+   */
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "1b02e5c500e54d719ff1ab29ce9bf2ea"
+    }
+  ],
+
+  "r2_buckets": [
+    {
+      "binding": "ATTACHMENTS",
+      "bucket_name": "email-attachments"
+    }
+  ],
+
+  "ai": { "binding": "AI" },
+
+  "env": {
+    "production": {
+      "name": "emails",
+      "workers_dev": true,
+      "observability": { "enabled": true },
+      "placement": { "mode": "smart" },
+      "compatibility_flags": ["nodejs_compat"],
+      "assets": {
+        "directory": ".open-next/assets",
+        "binding": "ASSETS"
+      },
+      "hyperdrive": [
+        {
+          "binding": "HYPERDRIVE",
+          "id": "3c425a8db80648cc9b5049a3d709421e"
+        }
+      ],
+      "r2_buckets": [
+        {
+          "binding": "ATTACHMENTS",
+          "bucket_name": "email-attachments"
+        }
+      ],
+      "ai": { "binding": "AI" }
+    }
+  }
+}
