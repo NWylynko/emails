@@ -3,8 +3,10 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "dev": "infisical run --env=dev -- wrangler dev --env=development",
-    "build": "infisical run --env=prod --projectId=39a9c656-043d-41b0-bc73-a288c8b22baa -- next build",
+    "dev": "infisical run --env=dev -- next dev -H 0.0.0.0",
+    "preview": "pnpm preview:build && infisical run --env=dev -- opennextjs-cloudflare preview --env=development",
+    "preview:build": "BUILD_INFISICAL_ENV=dev opennextjs-cloudflare build --env=development",
+    "build": "infisical run --env=${BUILD_INFISICAL_ENV:-prod} --projectId=39a9c656-043d-41b0-bc73-a288c8b22baa -- next build",
     "start": "infisical run --env=prod --projectId=39a9c656-043d-41b0-bc73-a288c8b22baa -- next start",
     "ci:build": "export INFISICAL_TOKEN=$(infisical login --method=universal-auth --silent --plain) && opennextjs-cloudflare build --env=production",
     "typecheck": "infisical run --env=dev -- next typegen && pnpm generate-types && tsc --noEmit",

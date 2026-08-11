@@ -10,9 +10,16 @@
   "observability": { "enabled": true },
   "placement": { "mode": "smart" },
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  // Bind the dev server to all interfaces, not just loopback — the box is
+  // developed on remotely, so localhost-only leaves it unreachable.
+  "dev": { "ip": "0.0.0.0" },
   "env": {
     "development": {
       "name": "emails-dev",
+      "assets": {
+        "directory": ".open-next/assets",
+        "binding": "ASSETS"
+      },
       "hyperdrive": [
         {
           "binding": "HYPERDRIVE",
