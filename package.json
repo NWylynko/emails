@@ -4,9 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "infisical run --env=dev -- wrangler dev --env=development",
-    "build": "infisical run --env=prod -- next build",
-    "start": "infisical run --env=prod -- next start",
-    "ci:build": "infisical login --method=universal-auth --plain && opennextjs-cloudflare build --env=production",
+    "build": "infisical run --token=$INFISICAL_TOKEN --env=prod -- next build",
+    "start": "infisical run --token=$INFISICAL_TOKEN --env=prod -- next start",
+    "ci:build": "export INFISICAL_TOKEN=$(infisical login --method=universal-auth --silent --plain) && opennextjs-cloudflare build --env=production",
     "typecheck": "infisical run --env=dev -- next typegen && pnpm generate-types && tsc --noEmit",
     "generate-types": "wrangler types --env-interface CloudflareEnv --env=development"
   },
