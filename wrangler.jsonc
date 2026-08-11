@@ -4,6 +4,9 @@
   "main": "worker.ts",
   "compatibility_date": "2026-08-04",
   "workers_dev": true,
+  // Explicit, or every deploy warns that enabling workers_dev implicitly
+  // enables per-version preview URLs. Dashboard had them disabled.
+  "preview_urls": false,
   "observability": { "enabled": true },
   "placement": { "mode": "smart" },
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
@@ -22,7 +25,10 @@
           "bucket_name": "email-attachments"
         }
       ],
-      "ai": { "binding": "AI" },
+      // remote:true acknowledges Workers AI always calls the real service even
+      // from local emulation, silencing the usage-charge warning wrangler
+      // prints whenever it instantiates the binding.
+      "ai": { "binding": "AI", "remote": true },
     },
     "production": {
       "name": "emails",
@@ -43,7 +49,7 @@
           "bucket_name": "email-attachments"
         }
       ],
-      "ai": { "binding": "AI" },
+      "ai": { "binding": "AI", "remote": true },
     }
   }
 }

@@ -7,14 +7,14 @@
  * the mail pipeline are a single deployable sharing one schema, one set of
  * bindings and one `wrangler tail`.
  */
-// @ts-expect-error ignore please :)
+// @ts-ignore — only resolves after `opennextjs-cloudflare build`; ts-expect-error
 import { default as handler } from "./.open-next/worker.js";
 import { receiveEmail } from "./src/email/receiveEmail";
 
 export default {
   fetch: handler.fetch,
 
-  async email(message) {
-    await receiveEmail(message);
+  async email(message, env) {
+    await receiveEmail(message, env);
   },
 } satisfies ExportedHandler<CloudflareEnv>;
