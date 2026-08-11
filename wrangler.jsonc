@@ -32,6 +32,12 @@
     },
     "production": {
       "name": "emails",
+      "routes": [
+        {
+          "pattern": "emails.wylynko.me",
+          "custom_domain": true
+        }
+      ],
       "assets": {
         "directory": ".open-next/assets",
         "binding": "ASSETS"
