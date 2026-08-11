@@ -21,28 +21,27 @@ import { sendViaResend } from "./sendViaResend";
 import { pusherUpdatePing } from "@/notification/pusherUpdatePing";
 import { notifyAboutEmail } from "@/notification/notifyAboutEmail";
 import { ENV } from "varlock/env"
-import { getCloudflareContext } from "@opennextjs/cloudflare";
 
 /** Mail from this address is a forward request, not ordinary inbound mail. */
 const PROXY_SENDER = "nick@wylynko.com";
 
 export async function receiveEmail(
   message: ForwardableEmailMessage,
+  env: CloudflareEnv
 ) {
-  const cloudflare = getCloudflareContext()
-  const db = createEmailsDbFromEnv(cloudflare.env.HYPERDRIVE);
+  const db = createEmailsDbFromEnv(env.HYPERDRIVE);
 
   const email = await simpleParser(await streamToString(message.raw));
 
   // An inlined photo can push these past the varchar(1_000_000) columns and
   // fail the INSERT, which used to take the whole handler down with it.
   const storedBody = await stashOversizedEmailPart(
-    cloudflare.env.ATTACHMENTS,
+    env.ATTACHMENTS,
     "body",
     email.text ?? "[no body]"
   );
   const storedHtml = email.html
-    ? await stashOversizedEmailPart(cloudflare.env.ATTACHMENTS, "html", email.html)
+    ? await stashOversizedEmailPart(env.ATTACHMENTS, "html", email.html)
     : undefined;
 
   const [result] = await db
@@ -58,7 +57,7 @@ export async function receiveEmail(
     .returning({ emailId: emails.emailId });
 
   for (const attachment of email.attachments) {
-    const object = await cloudflare.env.ATTACHMENTS.put(
+    const object = await env.ATTACHMENTS.put(
       crypto.randomUUID(),
       attachment.content,
       { md5: attachment.checksum }
