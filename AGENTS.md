@@ -106,6 +106,14 @@ properties:
   lives in Infisical's dev environment and points at `ep-flat-king`.
 - **`wrangler dev --remote` DOES use the deployed Hyperdrive config.** Never use
   that flag on this project.
+- **Hyperdrive query caching must stay disabled** on the prod config
+  (`caching: {disabled: true}`, set 2026-08-11). It once had `max_age: 3600`,
+  which served the homepage's inbox-list aggregate from an hour-old snapshot
+  while the per-inbox query (a different cache key) looked fresh — new mail
+  notified instantly but never reordered the list. Looks exactly like a Next.js
+  caching bug; it isn't. Caching is a dashboard/API setting on the Hyperdrive
+  config, not in wrangler.jsonc. The dev config still has default caching
+  (60s) — if dev reads ever look stale, that's why.
 
 ## Running it
 
