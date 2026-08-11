@@ -25,6 +25,6 @@ minimumReleaseAgeExclude:
   - wrangler@4.120.1
 
 allowBuilds:
-  '@infisical/cli': set this to true or false
-  esbuild: set this to true or false
-  workerd: set this to true or false
+  '@infisical/cli': true
+  esbuild: true
+  workerd: true
