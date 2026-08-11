@@ -1,13 +1,5 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  /**
-   * The TOP-LEVEL config is the DEV one, and is deliberately named differently
-   * from production. A bare `wrangler deploy` therefore publishes a separate
-   * `emails-dev` Worker and can never overwrite production with dev bindings —
-   * which would silently write inbound mail into the ep-flat-king clone.
-   *
-   * Production is `wrangler deploy --env production`, which `pnpm deploy` does.
-   */
   "name": "emails",
   "main": "worker.ts",
   "compatibility_date": "2026-08-04",
@@ -17,6 +9,7 @@
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "env": {
     "development": {
+      "name": "emails-dev",
       "hyperdrive": [
         {
           "binding": "HYPERDRIVE",
@@ -32,6 +25,7 @@
       "ai": { "binding": "AI" },
     },
     "production": {
+      "name": "emails",
       "assets": {
         "directory": ".open-next/assets",
         "binding": "ASSETS"
@@ -39,7 +33,8 @@
       "hyperdrive": [
         {
           "binding": "HYPERDRIVE",
-          "id": "3c425a8db80648cc9b5049a3d709421e"
+          "id": "3c425a8db80648cc9b5049a3d709421e",
+          "localConnectionString": "postgresql://placeholder:placeholder@localhost:5432/placeholder"
         }
       ],
       "r2_buckets": [
