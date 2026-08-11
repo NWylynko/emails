@@ -6,7 +6,25 @@ onlyBuiltDependencies:
   # the hook is skipped and node_modules/.bin/infisical is never created.
   - '@infisical/cli'
 
+# Supply-chain cooldown: refuse any package version published less than 3 days
+# ago, so compromised releases have time to be caught and yanked. pnpm 11
+# defaults to 1440 (1 day); this triples it. Units are minutes.
+minimumReleaseAge: 4320
+
 # varlock's Next.js integration works by replacing Next's own env loader.
 # Required by @varlock/nextjs-integration; overrides are read from here.
 overrides:
   "@next/env": "npm:@varlock/nextjs-integration"
+
+minimumReleaseAgeExclude:
+  - lucide-react@1.31.0
+  - miniflare@5.20260804.0-alpha
+  - react-hook-form@7.85.0
+  - sonner@2.0.8
+  - varlock@1.16.1
+  - wrangler@4.120.1
+
+allowBuilds:
+  '@infisical/cli': set this to true or false
+  esbuild: set this to true or false
+  workerd: set this to true or false
