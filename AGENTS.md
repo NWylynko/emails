@@ -93,7 +93,7 @@ Two Neon databases, and they are **not** the same:
 | | Endpoint | Hyperdrive config | Safe? |
 |---|---|---|---|
 | Production | `ep-purple-bread-a782nann` | `neon-email-database` `3c425a8db8…` | **NO — real mail** |
-| Dev clone | `ep-flat-king-a7yv3mu7` | `neon-email-database-dev` `1b02e5c500…` | yes, develop here |
+| Dev clone | `ep-twilight-sunset-a76wg4dm` | `neon-email-database-dev` `1b02e5c500…` | yes, develop here |
 
 `wrangler.jsonc` has no top-level bindings: `env.development` (`emails-dev`
 Worker, dev Hyperdrive) and `env.production` (`emails` Worker, prod Hyperdrive,
@@ -103,7 +103,20 @@ properties:
 - **`wrangler dev` cannot reach production.** Miniflare refuses to use a remote
   Hyperdrive locally — it errors demanding
   `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE`. That variable
-  lives in Infisical's dev environment and points at `ep-flat-king`.
+  lives in Infisical's dev environment and points at `ep-twilight-sunset`.
+
+  The dev branch is disposable and has been recreated before (it was
+  `ep-flat-king-a7yv3mu7` until 2026-08-11). Deleting it does not fail loudly:
+  Neon's proxy cannot route to a dead endpoint, so every query comes back
+  `28P01 password authentication failed` — which reads as a stale credential,
+  not a missing database. Recreate by branching from production; there is no
+  migration tooling in this repo (no drizzle-kit, no migrations directory —
+  `src/database/schema.ts` is the only definition), so a blank database cannot
+  be populated without adding some. After recreating, update BOTH
+  `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE` in Infisical dev
+  (local dev reads this) and the `neon-email-database-dev` Hyperdrive origin
+  via `wrangler hyperdrive update` (the deployed `emails-dev` Worker reads
+  that). Updating only the first leaves local dev working and the Worker broken.
 - **`wrangler dev --remote` DOES use the deployed Hyperdrive config.** Never use
   that flag on this project.
 - **Hyperdrive query caching must stay disabled** on the prod config
@@ -118,11 +131,55 @@ properties:
 ## Running it
 
 ```bash
-pnpm dev              # infisical run --env=dev -- wrangler dev --env=development
+pnpm dev              # next dev -H 0.0.0.0 on :3000 — hot reload, the daily driver
+pnpm preview          # preview:build + opennextjs-cloudflare preview on :8787 — real workerd
+pnpm preview:build    # BUILD_INFISICAL_ENV=dev opennextjs-cloudflare build --env=development
 pnpm typecheck        # next typegen + pnpm generate-types + tsc --noEmit
 pnpm generate-types   # wrangler types --env=development -> worker-configuration.d.ts
-pnpm build            # next build under prod Infisical values (used by ci:build)
+pnpm build            # next build; prod Infisical values unless BUILD_INFISICAL_ENV says otherwise
 pnpm ci:build         # CI only: machine-identity login + opennextjs-cloudflare build
+```
+
+**Develop on `pnpm dev`.** It is `next dev`, so edits hot-reload and there is no
+build step. `initOpenNextCloudflareForDev()` in `next.config.ts` gives it the
+real bindings through miniflare, so `getCloudflareContext()` works.
+
+That call **must** be passed `{ environment: "development" }`. `wrangler.jsonc`
+has no top-level bindings, so the bare `initOpenNextCloudflareForDev()` loads an
+empty binding set and the first Hyperdrive query dies with `Cannot read
+properties of undefined (reading 'connectionString')`.
+
+Reach for `pnpm preview` only to check something workerd-specific before
+shipping. It serves the `.open-next/` artifact, so nothing you edit appears
+until it rebuilds — and it binds :8787 while `pnpm dev` binds :3000, so both can
+run at once.
+
+Both bind `0.0.0.0`, not localhost, because this box is developed on remotely:
+`dev.ip` in `wrangler.jsonc` for the wrangler side, `-H 0.0.0.0` for Next.
+`allowedDevOrigins` in `next.config.ts` must also list the hostname you browse
+from, or Next rejects the cross-origin dev request.
+
+### The build environment decides which Clerk instance you get
+
+`opennextjs-cloudflare build` does not call `next build` directly — it shells
+out to the packager (`pnpm build`) via `buildNextjsApp` in
+`@opennextjs/aws/dist/build/buildNextApp.js`. So the `build` script's own
+`infisical run` wins over any wrapper around it: `infisical run --env=dev --
+opennextjs-cloudflare build` still built under **prod** values, because the
+inner call said `--env=prod`.
+
+That matters because the Clerk publishable key is inlined into the client chunks
+at build time (see `.env.schema`). A prod-built artifact served by `wrangler dev`
+loads production Clerk, which rejects `localhost` and every other non-production
+origin with a 400 `origin_invalid` — an error that looks like a CORS or hostname
+problem and is neither.
+
+Hence `BUILD_INFISICAL_ENV`: `build` reads `--env=${BUILD_INFISICAL_ENV:-prod}`,
+so CI and `pnpm build` keep their prod default and only `preview:build` overrides it.
+Check which instance an artifact carries with:
+
+```bash
+grep -rhoE 'pk_(live|test)_[A-Za-z0-9=]+' .open-next/assets/ | sort -u
 ```
 
 The old `preview` / `deploy` / `deploy:dev` / `dev:worker` / `cf:build` /
@@ -381,3 +438,13 @@ Not done:
   (`sendViaResend`) has not been exercised in prod since the cutover.
 - The `emails-dev` Worker exists from an earlier CI misfire; decide whether
   `pnpm dev` local emulation makes it redundant.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

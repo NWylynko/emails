@@ -13,8 +13,12 @@ import { varlockNextConfigPlugin } from "@varlock/nextjs-integration/plugin";
 // unguarded call fails any build that does not have a local database — exactly
 // what happens in CI, where the prod environment quite correctly has no such
 // variable.
+// `environment` is required, not cosmetic: wrangler.jsonc carries no top-level
+// bindings, so without it miniflare loads an empty binding set and every
+// getCloudflareContext() read fails with "Cannot read properties of undefined
+// (reading 'connectionString')" on the first Hyperdrive query.
 if (process.env.NODE_ENV === "development") {
-  initOpenNextCloudflareForDev();
+  initOpenNextCloudflareForDev({ environment: "development" });
 }
 
 // varlock replaces Next's env loader (see the @next/env override in
