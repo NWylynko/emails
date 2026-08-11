@@ -20,7 +20,6 @@ import { stashOversizedEmailPart } from "./stashOversizedEmailPart";
 import { sendViaResend } from "./sendViaResend";
 import { pusherUpdatePing } from "@/notification/pusherUpdatePing";
 import { notifyAboutEmail } from "@/notification/notifyAboutEmail";
-import { ENV } from "varlock/env"
 
 /** Mail from this address is a forward request, not ordinary inbound mail. */
 const PROXY_SENDER = "nick@wylynko.com";
@@ -77,7 +76,7 @@ export async function receiveEmail(
     });
   }
 
-  await pusherUpdatePing();
+  await pusherUpdatePing(env);
 
   const [inbox] = await db
     .select({ silent: inboxes.silent, receiver: inboxes.receiver })
@@ -100,6 +99,7 @@ export async function receiveEmail(
   if (message.from !== PROXY_SENDER) {
     if (inbox?.silent !== true) {
       await notifyAboutEmail(
+        env,
         result.emailId,
         `New Email for ${message.to}`,
         email.subject ?? message.from
@@ -114,7 +114,7 @@ export async function receiveEmail(
   // credential it does not use — and a failed delivery is retried by Email
   // Routing, so that would duplicate rows for all inbound mail, not just
   // forwards.
-  const resend = new Resend(ENV.RESEND_KEY);
+  const resend = new Resend(env.RESEND_KEY);
 
   // Forward-on path. Each failure mode mails Nick back rather than silently
   // dropping the message.
@@ -165,6 +165,7 @@ export async function receiveEmail(
   });
 
   await notifyAboutEmail(
+    env,
     result.emailId,
     `Email sent to ${inbox.receiver}`,
     `Email sent to ${inbox.receiver}`
