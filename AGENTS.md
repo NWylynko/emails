@@ -376,8 +376,6 @@ Not done:
 
 - The old `email-service` Worker and the `email-client`/`email-cli` repos still
   exist. Decommission/archive them once the new pipeline has soaked.
-- `@neondatabase/serverless` is back in package.json but nothing imports it —
-  remove on the next dependency pass.
 - The prod `RESEND_KEY` can send (verified) but its `/domains` listing is
   empty, so it may be a sending-only key. The forward-on path
   (`sendViaResend`) has not been exercised in prod since the cutover.
