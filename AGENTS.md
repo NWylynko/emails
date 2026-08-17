@@ -174,6 +174,55 @@ migrated *before* the code that reads it is pushed, or the deployed Worker
 queries a column that isn't there yet. Run `pnpm db:migrate:prod`, confirm it,
 then push.
 
+## Seeding dev
+
+The dev clone is routinely empty — it was empty when drizzle-kit landed, and
+recreating it produces a blank database. `pnpm db:seed:dev` fills it with fake
+mail so the UI has something to render and search has something to match.
+
+```bash
+pnpm db:seed:dev                  # append ~409 emails across 12 inboxes
+pnpm db:seed:dev -- --reset       # delete existing rows first
+pnpm db:seed:dev -- --count=2000  # a corpus nearer production's size
+pnpm db:seed:dev -- --seed=7      # a different, still deterministic, corpus
+```
+
+`src/database/seed/fakeMailCorpus.ts` generates from a seeded PRNG, never
+`Math.random()`, so a given seed always produces byte-identical output. The
+search tests depend on that — they assert that a query returns a specific
+message, which is only meaningful if the corpus is reproducible.
+
+It deliberately includes the awkward rows, because seeded data made only of
+tidy mail gives false confidence:
+
+| fixture | why it is there |
+|---|---|
+| `SEARCH_FIXTURES.uniqueToken` | a token appearing exactly once, so retrieval is exactly assertable |
+| `subjectWeighted` / `bodyWeighted` | same term in subject vs body — proves the ranking weights |
+| `stemming` | "cancellations" must be found by searching "cancel" |
+| `phrase` / `phraseDecoy` | same words, different order — proves phrase search |
+| `unicode` | umlauts and emoji must round-trip and stay searchable |
+| `oversizedPointer` | body is an `r2:` pointer, so its content is **not** searchable |
+| overflow fixture | 800k chars of high-entropy tokens — overflows an unguarded tsvector |
+
+**There is no `db:seed:prod` and there must never be one.** The seeder refuses
+to run against a database it does not recognise: it denylists the production
+endpoint by id *and* requires the host to match a known dev endpoint, so an
+unfamiliar host is refused rather than assumed safe. The check runs before any
+connection is opened. If the dev clone is recreated, update `DEV_ENDPOINT_IDS`
+in `src/database/seed/seedDevDatabase.ts`; `SEED_ALLOW_UNKNOWN_HOST=1` overrides
+it for a genuinely throwaway database.
+
+Postgres only — attachment rows are created but the R2 objects they point at are
+not, so attachment downloads 404 against a seeded database exactly as they do on
+a fresh checkout. Seed one by hand if you need that path:
+`npx wrangler r2 object put email-attachments/<r2Key> --file=x --local`.
+
+The seeder runs on Node's built-in TypeScript stripping — no `tsx`, no build
+step. That is why its imports spell out `.ts` extensions (Node does no
+extension resolution) and why `allowImportingTsExtensions` is set in
+`tsconfig.json`.
+
 ## Running it
 
 ```bash

@@ -15,6 +15,10 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
+    // Node runs src/database/seed/*.ts directly via its built-in type
+    // stripping, which does no extension resolution — those imports must spell
+    // out `.ts`. Safe here because `noEmit` is set, so nothing is rewritten.
+    "allowImportingTsExtensions": true,
     "jsx": "react-jsx",
     "incremental": true,
     "plugins": [
