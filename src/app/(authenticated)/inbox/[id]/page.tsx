@@ -9,6 +9,7 @@ import {
   setInboxSilent,
 } from "@/inbox/inboxQueries";
 import { formatDistanceToNow } from "date-fns";
+import { EmailSearchBox } from "@/search/EmailSearchBox";
 import { connection } from "next/server";
 import { RefreshButton } from "@/components/RefreshButton";
 import {
@@ -44,14 +45,15 @@ export default async function InboxPage(props: PageProps<"/inbox/[id]">) {
 
   return (
     <div className="space-y-4">
-      <header className="flex flex-row items-center justify-between">
-        <div className="flex items-center space-x-4">
+      <header className="flex flex-row items-center justify-between gap-4">
+        <div className="flex min-w-0 items-center space-x-4">
           <Link href="/" className="text-gray-500 hover:text-gray-700">
             <ArrowLeft className="h-6 w-6" />
           </Link>
-          <h1 className="text-2xl font-bold">Inbox {inboxEmail}</h1>
+          <h1 className="truncate text-2xl font-bold">Inbox {inboxEmail}</h1>
         </div>
-        <div className="flex items-center gap-4">
+        <EmailSearchBox inbox={inboxEmail} />
+        <div className="flex shrink-0 items-center gap-4">
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="outline" size="icon">
