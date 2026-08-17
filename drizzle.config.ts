@@ -22,13 +22,27 @@ import { defineConfig } from "drizzle-kit";
  * Migrations live under the database vertical rather than a root-level
  * `drizzle/` directory, so the schema and its history sit together.
  */
+const url = process.env.MIGRATIONS_DATABASE_URL;
+
+// drizzle-kit's own message for this is "[x] url: undefined", which does not
+// say where the value is meant to come from. In CI this is the difference
+// between a one-line fix and a debugging session.
+if (!url) {
+  throw new Error(
+    "MIGRATIONS_DATABASE_URL is not set.\n\n" +
+      "It comes from Infisical, and every db:* script wraps itself in `infisical run`:\n" +
+      "  pnpm db:migrate:dev    (dev clone)\n" +
+      "  pnpm ci:migrate        (production — runs in Workers Builds)\n\n" +
+      "If this failed in CI, the variable is missing from Infisical's prod environment.\n" +
+      "It must be the UNPOOLED Neon endpoint: the host WITHOUT '-pooler'."
+  );
+}
+
 export default defineConfig({
   dialect: "postgresql",
   schema: "./src/database/schema.ts",
   out: "./src/database/migrations",
-  dbCredentials: {
-    url: process.env.MIGRATIONS_DATABASE_URL!,
-  },
+  dbCredentials: { url },
   // The schema declares camelCase column names verbatim ("emailId", "r2Key"),
   // which is what the live tables use. Leaving `casing` unset preserves that;
   // setting it to snake_case would generate a migration renaming every column.

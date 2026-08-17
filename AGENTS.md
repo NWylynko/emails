@@ -168,11 +168,36 @@ complete schema in a freshly created empty database.
 Hand-editing a generated `.sql` does **not** break future diffs — drizzle-kit
 compares `meta/*_snapshot.json`, not the SQL text.
 
-**Deploy order matters and there is no automation for it.** Migrations do not
-run in CI; the Worker deploy does. So a change that adds a column has to be
-migrated *before* the code that reads it is pushed, or the deployed Worker
-queries a column that isn't there yet. Run `pnpm db:migrate:prod`, confirm it,
-then push.
+### Production migrations run in CI
+
+`pnpm ci:build` runs `pnpm ci:migrate` before it builds, so a push to `main`
+applies pending migrations and only then builds and deploys. That ordering is
+the point: the schema is always at or ahead of the code that reads it, and the
+"migrated before deployed" rule cannot be forgotten.
+
+```
+ci:build = infisical login  &&  ci:migrate  &&  opennextjs-cloudflare build
+```
+
+Consequences worth knowing before writing a migration:
+
+- **A failed migration fails the build, so nothing deploys.** That is the safe
+  direction, but it does mean a bad migration blocks all deploys until fixed.
+- **Migrations apply before the deploy that needs them**, so there is a window
+  where the new schema is live under the old Worker. Additive changes (a new
+  column, a new index) are invisible to it. A *destructive* change — dropping or
+  renaming a column the deployed Worker still selects — breaks production during
+  that window. Split those across two deploys: stop reading it, deploy, then
+  drop it.
+- **`MIGRATIONS_DATABASE_URL` must exist in Infisical's prod environment.**
+  Without it the build fails with an explicit message from `drizzle.config.ts`.
+  It must be the unpooled endpoint.
+- Two builds racing could both run `migrate`. drizzle records applied migrations
+  in `drizzle.__drizzle_migrations`, but takes no advisory lock, so avoid
+  pushing twice in quick succession behind a long migration.
+
+`pnpm db:migrate:prod` still exists for applying a migration by hand, but the
+normal path is to let CI do it.
 
 ## Search
 
@@ -619,6 +644,15 @@ Done:
   "The mail handler".
 
 Not done:
+
+- **`MIGRATIONS_DATABASE_URL` is not yet in Infisical's prod environment, and
+  the next push to `main` will fail the build until it is.** Verified on
+  2026-08-17: `infisical run --env=prod` injects 11 values, not 12. Add the
+  **unpooled** `ep-purple-bread-a782nann` connection string (host *without*
+  `-pooler`) to the prod environment. Until then production is still on
+  migration `0000` and has no `emails.search` column, so `/search`,
+  `/v1/search` and `/v1/emails/:id` would all fail against it.
+- The Rust CLI has no `search` subcommand for `GET /v1/search`.
 
 - The old `email-service` Worker and the `email-client`/`email-cli` repos still
   exist. Decommission/archive them once the new pipeline has soaked.
