@@ -74,13 +74,28 @@ const INBOXES = [
  * and nothing else, which only holds if the categories do not all share filler
  * text.
  */
+/**
+ * Facts generated once per email and shared by its subject and body, so the two
+ * agree. Generating them independently produced mail whose subject quoted one
+ * verification code while its body quoted a different one — harmless to the
+ * index, but confusing enough to waste someone's time when they are staring at
+ * seeded data trying to decide whether a bug is real.
+ */
+type MailFacts = {
+  code: string;
+  amount: string;
+  refund: string;
+  tracking: string;
+  deploySucceeded: boolean;
+};
+
 const TEMPLATES = [
   {
     kind: "verification",
     senders: ["noreply@github.com", "accounts@google.com", "no-reply@discord.com"],
-    subject: (r: () => number) => `Your verification code is ${100000 + Math.floor(r() * 899999)}`,
-    body: (r: () => number, code: string) =>
-      `Someone requested a sign-in code for your account.\n\nYour verification code is ${code}. It expires in 10 minutes.\n\nIf you did not request this code, you can safely ignore this email — nobody can access your account without it.`,
+    subject: (f: MailFacts) => `Your verification code is ${f.code}`,
+    body: (f: MailFacts) =>
+      `Someone requested a sign-in code for your account.\n\nYour verification code is ${f.code}. It expires in 10 minutes.\n\nIf you did not request this code, you can safely ignore this email — nobody can access your account without it.`,
   },
   {
     kind: "password-reset",
@@ -92,30 +107,30 @@ const TEMPLATES = [
   {
     kind: "receipt",
     senders: ["billing@stripe.com", "receipts@apple.com", "invoice@cloudflare.com"],
-    subject: (r: () => number) => `Your receipt — $${(r() * 200).toFixed(2)}`,
-    body: (r: () => number) =>
-      `Thanks for your payment.\n\nAmount charged: $${(r() * 200).toFixed(2)}\nPayment method: Visa ending 4242\n\nThis receipt is for your records. Your subscription renews automatically each month until cancelled.`,
+    subject: (f: MailFacts) => `Your receipt — $${f.amount}`,
+    body: (f: MailFacts) =>
+      `Thanks for your payment.\n\nAmount charged: $${f.amount}\nPayment method: Visa ending 4242\n\nThis receipt is for your records. Your subscription renews automatically each month until cancelled.`,
   },
   {
     kind: "refund",
     senders: ["orders@amazon.com", "help@etsy.com", "support@ebay.com"],
     subject: () => "Your refund has been processed",
-    body: (r: () => number) =>
-      `We have processed a refund of $${(r() * 90).toFixed(2)} back to your original payment method.\n\nRefunds usually appear on your statement within five to ten business days depending on your bank.\n\nSorry the item did not work out.`,
+    body: (f: MailFacts) =>
+      `We have processed a refund of $${f.refund} back to your original payment method.\n\nRefunds usually appear on your statement within five to ten business days depending on your bank.\n\nSorry the item did not work out.`,
   },
   {
     kind: "shipping",
     senders: ["tracking@dhl.com", "notify@auspost.com.au", "shipment@ups.com"],
-    subject: (r: () => number) => `Your parcel is on its way — ${Math.floor(r() * 9e9).toString(36).toUpperCase()}`,
-    body: () =>
-      `Good news, your parcel has left our depot and is out for delivery today.\n\nYou can follow the tracking number above for live updates. A signature will be required on delivery.`,
+    subject: (f: MailFacts) => `Your parcel is on its way — ${f.tracking}`,
+    body: (f: MailFacts) =>
+      `Good news, your parcel has left our depot and is out for delivery today.\n\nTracking number ${f.tracking} — follow it for live updates. A signature will be required on delivery.`,
   },
   {
     kind: "deployment",
     senders: ["notifications@vercel.com", "builds@cloudflare.com", "ci@github.com"],
-    subject: (r: () => number) => (r() > 0.5 ? "Deployment succeeded" : "Deployment failed"),
-    body: () =>
-      `Your latest build finished.\n\nThe deployment pipeline ran the install step, the build step and the upload step. Check the build logs for the full output including any warnings emitted during compilation.`,
+    subject: (f: MailFacts) => (f.deploySucceeded ? "Deployment succeeded" : "Deployment failed"),
+    body: (f: MailFacts) =>
+      `Your latest build ${f.deploySucceeded ? "finished successfully" : "failed"}.\n\nThe deployment pipeline ran the install step, the build step and the upload step. Check the build logs for the full output including any warnings emitted during compilation.`,
   },
   {
     kind: "security-alert",
@@ -263,9 +278,17 @@ export function generateFakeMailCorpus(count: number, seed = 20260817): FakeMail
     const template = pick(r, TEMPLATES);
     const to = pick(r, INBOXES);
     const from = pick(r, template.senders);
-    const code = String(100000 + Math.floor(r() * 899999));
-    const subject = template.subject(r);
-    const body = template.body(r, code);
+
+    const facts: MailFacts = {
+      code: String(100000 + Math.floor(r() * 899999)),
+      amount: (r() * 200).toFixed(2),
+      refund: (r() * 90).toFixed(2),
+      tracking: Math.floor(r() * 9e9).toString(36).toUpperCase(),
+      deploySucceeded: r() > 0.5,
+    };
+
+    const subject = template.subject(facts);
+    const body = template.body(facts);
 
     // Older mail is mostly read, recent mail mostly not — which is what makes
     // the unread badges on the inbox list look like a real account.

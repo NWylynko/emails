@@ -24,13 +24,23 @@ import { defineConfig } from "drizzle-kit";
  */
 const url = process.env.MIGRATIONS_DATABASE_URL;
 
+/**
+ * `generate` and `check` only diff schema files against the stored snapshots —
+ * they never open a connection, so they must keep working without a database
+ * URL. Only the commands that actually connect are worth failing early for.
+ */
+const COMMANDS_NEEDING_A_CONNECTION = ["migrate", "push", "pull", "studio", "drop", "up"];
+const needsConnection = process.argv.some((arg) =>
+  COMMANDS_NEEDING_A_CONNECTION.includes(arg)
+);
+
 // drizzle-kit's own message for this is "[x] url: undefined", which does not
 // say where the value is meant to come from. In CI this is the difference
 // between a one-line fix and a debugging session.
-if (!url) {
+if (!url && needsConnection) {
   throw new Error(
     "MIGRATIONS_DATABASE_URL is not set.\n\n" +
-      "It comes from Infisical, and every db:* script wraps itself in `infisical run`:\n" +
+      "It comes from Infisical, and every db:* script that connects wraps itself in `infisical run`:\n" +
       "  pnpm db:migrate:dev    (dev clone)\n" +
       "  pnpm ci:migrate        (production — runs in Workers Builds)\n\n" +
       "If this failed in CI, the variable is missing from Infisical's prod environment.\n" +
@@ -42,7 +52,7 @@ export default defineConfig({
   dialect: "postgresql",
   schema: "./src/database/schema.ts",
   out: "./src/database/migrations",
-  dbCredentials: { url },
+  dbCredentials: { url: url ?? "" },
   // The schema declares camelCase column names verbatim ("emailId", "r2Key"),
   // which is what the live tables use. Leaving `casing` unset preserves that;
   // setting it to snake_case would generate a migration renaming every column.

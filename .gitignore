@@ -36,3 +36,6 @@ next-env.d.ts
 
 # rust cli
 /cli/target/
+
+# playwright mcp scratch (snapshots, console logs, screenshots)
+/.playwright-mcp/

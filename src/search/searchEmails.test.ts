@@ -133,6 +133,34 @@ describe("searchEmails", () => {
     );
   });
 
+  test("finds mail by part of the sender address", async () => {
+    // Postgres tokenises an email address as ONE lexeme — `noreply@github.com`
+    // does not split into "github" — so without help, searching a sender's name
+    // or domain returns nothing at all. Searching by who sent it is one of the
+    // most natural things to type into a mail search box.
+    for (const term of ["github", "etsy", "cloudflare"]) {
+      const results = await searchEmails(db, { query: term, limit: 200 });
+
+      assert.ok(
+        results.length > 0,
+        `searching "${term}" must find mail from that sender, got 0 results`
+      );
+      assert.ok(
+        results.some((r) => r.from.includes(term)),
+        `results for "${term}" should include mail actually from that sender`
+      );
+    }
+  });
+
+  test("still matches a full sender address exactly", async () => {
+    const results = await searchEmails(db, { query: "help@etsy.com", limit: 200 });
+
+    assert.ok(results.length > 0, "the whole address must still be searchable");
+    for (const row of results) {
+      assert.equal(row.from, "help@etsy.com");
+    }
+  });
+
   test("finds unicode content and returns it intact", async () => {
     const results = await searchEmails(db, { query: "München" });
 
