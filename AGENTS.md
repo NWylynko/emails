@@ -21,6 +21,8 @@ worker.ts            entry: wraps .open-next/worker.js, adds the email() handler
 src/                 Next.js App Router app (Clerk auth, Drizzle, R2, Workers AI)
 src/middleware.ts    Clerk gate — NOT proxy.ts, see below
 src/database/schema.ts   the single copy of the schema (was duplicated across two repos)
+src/database/migrations/ drizzle-kit migrations; 0000 is an idempotent baseline
+drizzle.config.ts    drizzle-kit config — migrations only, never read by the app
 src/inbox/inboxQueries.ts    inbox reads/writes, shared by the website and /v1
 src/email/emailQueries.ts    email/attachment reads, shared by the website and /v1
 src/app/v1/              the CLI API (Bearer token, not Clerk)
@@ -109,10 +111,10 @@ properties:
   `ep-flat-king-a7yv3mu7` until 2026-08-11). Deleting it does not fail loudly:
   Neon's proxy cannot route to a dead endpoint, so every query comes back
   `28P01 password authentication failed` — which reads as a stale credential,
-  not a missing database. Recreate by branching from production; there is no
-  migration tooling in this repo (no drizzle-kit, no migrations directory —
-  `src/database/schema.ts` is the only definition), so a blank database cannot
-  be populated without adding some. After recreating, update BOTH
+  not a missing database. Recreate either by branching from production or, since
+  drizzle-kit landed, by pointing `MIGRATIONS_DATABASE_URL` at the blank database
+  and running `pnpm db:migrate:dev` — migration `0000` builds the whole schema
+  from scratch (verified against an empty database). After recreating, update BOTH
   `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE` in Infisical dev
   (local dev reads this) and the `neon-email-database-dev` Hyperdrive origin
   via `wrangler hyperdrive update` (the deployed `emails-dev` Worker reads
@@ -128,6 +130,50 @@ properties:
   config, not in wrangler.jsonc. The dev config still has default caching
   (60s) — if dev reads ever look stale, that's why.
 
+## Migrations
+
+drizzle-kit owns schema changes. `src/database/schema.ts` is still the single
+definition — migrations are generated *from* it, never hand-written to diverge
+from it.
+
+```bash
+pnpm db:generate      # diff schema.ts against the last snapshot -> a new .sql
+pnpm db:check         # verify the migration files and journal are consistent
+pnpm db:migrate:dev   # apply to the dev clone
+pnpm db:migrate:prod  # apply to production — real mail, see below
+pnpm db:studio:dev    # drizzle studio against the dev clone
+```
+
+Both migrate scripts are wrapped in `infisical run`, so they read
+`MIGRATIONS_DATABASE_URL` from the matching environment. **That variable is not
+`DATABASE_URL` on purpose** — the old `DATABASE_URL` was deleted at the
+Hyperdrive cutover, and reviving the name would imply the running app takes a
+connection string again. It doesn't: the app only ever reaches Postgres through
+the `HYPERDRIVE` binding. `MIGRATIONS_DATABASE_URL` is used by drizzle-kit and
+the seeder, nothing else.
+
+It must point at the **unpooled** Neon endpoint — the host *without* `-pooler`.
+The pooled endpoint is pgbouncer in transaction mode; Hyperdrive talks to it for
+ordinary queries, but it is the wrong target for DDL.
+
+**Migration `0000` is an idempotent baseline.** It describes the schema as it
+already existed when drizzle-kit was introduced, using `CREATE TABLE IF NOT
+EXISTS` and an exception-guarded `ADD CONSTRAINT`. That is what let the two live
+databases come under migration control without hand-inserting rows into
+`drizzle.__drizzle_migrations`, and it is also why a blank database can now be
+built from scratch. Verified both ways: applied cleanly to the existing dev
+clone (the guards fire as `already exists, skipping` notices), and built a
+complete schema in a freshly created empty database.
+
+Hand-editing a generated `.sql` does **not** break future diffs — drizzle-kit
+compares `meta/*_snapshot.json`, not the SQL text.
+
+**Deploy order matters and there is no automation for it.** Migrations do not
+run in CI; the Worker deploy does. So a change that adds a column has to be
+migrated *before* the code that reads it is pushed, or the deployed Worker
+queries a column that isn't there yet. Run `pnpm db:migrate:prod`, confirm it,
+then push.
+
 ## Running it
 
 ```bash
@@ -136,6 +182,8 @@ pnpm preview          # preview:build + opennextjs-cloudflare preview on :8787 �
 pnpm preview:build    # BUILD_INFISICAL_ENV=dev opennextjs-cloudflare build --env=development
 pnpm typecheck        # next typegen + pnpm generate-types + tsc --noEmit
 pnpm generate-types   # wrangler types --env=development -> worker-configuration.d.ts
+pnpm db:migrate:dev   # apply migrations to the dev clone (see "Migrations")
+pnpm db:seed:dev      # fill the dev clone with fake mail (see "Seeding dev")
 pnpm build            # next build; prod Infisical values unless BUILD_INFISICAL_ENV says otherwise
 pnpm ci:build         # CI only: machine-identity login + opennextjs-cloudflare build
 ```
