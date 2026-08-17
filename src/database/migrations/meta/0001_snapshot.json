@@ -1,5 +1,5 @@
 {
-  "id": "ce897b2e-50bd-4268-ac0b-39c192faa962",
+  "id": "3cc3794c-441a-46c5-9418-3b0fbb8cfc5b",
   "prevId": "08d41ea0-95df-4c4c-8948-d3dd3cd125ac",
   "version": "7",
   "dialect": "postgresql",
@@ -154,7 +154,7 @@
           "primaryKey": false,
           "notNull": false,
           "generated": {
-            "as": "\n  setweight(to_tsvector('english', coalesce(\"subject\", '')), 'A') ||\n  setweight(to_tsvector('english', coalesce(\"from\", '')), 'B') ||\n  setweight(to_tsvector('english', left(\"body\", 200000)), 'C')\n",
+            "as": "\n  setweight(to_tsvector('english', coalesce(\"subject\", '')), 'A') ||\n  setweight(to_tsvector('english', coalesce(\"from\", '')), 'B') ||\n  setweight(to_tsvector('english', translate(coalesce(\"from\", ''), '@._-', '    ')), 'B') ||\n  setweight(to_tsvector('english', left(\"body\", 200000)), 'C')\n",
             "type": "stored"
           }
         }

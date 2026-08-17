@@ -198,9 +198,17 @@ the expression on `emails.search` makes it emit `DROP COLUMN` + `ADD COLUMN`,
 and dropping a column drops every index on it. Its snapshot still believes
 `emailSearchIdx` exists, so it emits nothing to rebuild it. Nothing errors —
 search keeps working on a sequential scan, and the missing index only shows up
-as a performance cliff once the corpus grows. Migration `0002` hit exactly this
-and re-creates the index by hand. **Check `pg_indexes` after any migration that
-touches a generated column.**
+as a performance cliff once the corpus grows. Hit and verified during
+development. **Re-create the index by hand in any migration that alters a
+generated column, and check `pg_indexes` afterwards.** (A migration that adds
+the column *and* index fresh is fine — drizzle emits both.)
+
+**A STORED generated column rewrites the whole table** under an ACCESS EXCLUSIVE
+lock, blocking reads and inbound mail INSERTs. Measure before running one on
+production: computing the expression over every row read-only is a good proxy,
+and it put `0001` at ~5.6s for 3,707 rows. Two migrations that each rewrite the
+table cost that twice, which is why the original 0001/0002 pair was squashed
+into one before it ever reached production.
 
 ### Production migrations run in CI
 
@@ -698,13 +706,22 @@ Done:
 
 Not done:
 
-- **`MIGRATIONS_DATABASE_URL` is not yet in Infisical's prod environment, and
-  the next push to `main` will fail the build until it is.** Verified on
-  2026-08-17: `infisical run --env=prod` injects 11 values, not 12. Add the
-  **unpooled** `ep-purple-bread-a782nann` connection string (host *without*
-  `-pooler`) to the prod environment. Until then production is still on
-  migration `0000` and has no `emails.search` column, so `/search`,
-  `/v1/search` and `/v1/emails/:id` would all fail against it.
+- **Production has not been migrated yet.** `MIGRATIONS_DATABASE_URL` is set in
+  Infisical prod (verified 2026-08-17: 12 values inject, unpooled
+  `ep-purple-bread-a782nann` host), but nothing has been pushed, so prod still
+  has no `drizzle` schema and no `emails.search` column. The next push to `main`
+  applies `0000` and `0001` via `ci:migrate` before the build.
+
+  Expect a brief write freeze when it lands. Adding a STORED generated column
+  rewrites the table under an ACCESS EXCLUSIVE lock, which blocks reads *and*
+  inbound mail INSERTs. Measured read-only against production: computing the
+  index expression for all 3,707 rows takes ~5.6s. Prefer a quiet moment —
+  Email Routing retries a delivery it could not complete, and AGENTS.md's
+  duplicate-row warning applies.
+
+  Also measured on production, so no surprises: 0 emails exceed the 200k-char
+  truncation, 0 have `r2:` pointer bodies, and the largest resulting tsvector is
+  88,531 bytes against the 1MB cap.
 - The Rust CLI has no `search` subcommand for `GET /v1/search`.
 
 - The old `email-service` Worker and the `email-client`/`email-cli` repos still

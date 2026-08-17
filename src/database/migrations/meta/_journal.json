@@ -12,15 +12,8 @@
     {
       "idx": 1,
       "version": "7",
-      "when": 1786983462144,
+      "when": 1787006527507,
       "tag": "0001_email_search_index",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1786985567824,
-      "tag": "0002_index_sender_parts",
       "breakpoints": true
     }
   ]
