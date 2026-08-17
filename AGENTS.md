@@ -174,6 +174,64 @@ migrated *before* the code that reads it is pushed, or the deployed Worker
 queries a column that isn't there yet. Run `pnpm db:migrate:prod`, confirm it,
 then push.
 
+## Search
+
+Full-text search over received mail, in Postgres. **There is no search service
+and no second copy of the data** — no Elastic, no Typesense, no D1 mirror, no
+embeddings. `emails.search` is a generated `tsvector` column with a GIN index,
+maintained by Postgres itself, which is why adding search required no change to
+the inbound `email()` path at all.
+
+That is a size judgement, not an ideological one: production held roughly 3,700
+emails when this was built. Measured on the real schema with 20k seeded rows, a
+ranked top-50 query plans as a `Bitmap Index Scan on "emailSearchIdx"` and
+executes in 3.4ms. Revisit if the corpus grows by orders of magnitude or if
+fuzzy/typo matching becomes a requirement — `pg_trgm` alongside is the next step
+before any external engine.
+
+| piece | where |
+|---|---|
+| index expression | `emailSearchExpression` in `src/database/schema.ts` |
+| the query | `searchEmails()` in `src/search/searchEmails.ts` |
+| results page | `/search`, scoped by `?inbox=` |
+| CLI API | `GET /v1/search?q=&inbox=&limit=&unread=` |
+
+Weighting is A=subject, B=sender, C=body, so a subject hit outranks the same
+term buried in a body.
+
+Three things here are load-bearing and easy to break:
+
+- **`to_tsvector` must be passed an explicit `'english'`.** The one-argument
+  form reads `default_text_search_config`, making it only STABLE, and Postgres
+  refuses a non-IMMUTABLE expression in a stored generated column.
+- **`left("body", 200000)` is not cosmetic.** A tsvector is hard-capped at 1MB
+  while `body` allows a million characters; high-entropy text runs about 1.4
+  bytes of tsvector per character. Measured: 807k characters of distinct tokens
+  produced 1,137,408 bytes and the INSERT failed with *"string is too long for
+  tsvector"*. That failure would land in the `email()` handler **after** the
+  message was accepted, so Email Routing would retry and duplicate the row —
+  the same silent class of bug as the varlock one. The seeder plants an 800k
+  character body specifically so this stays proven.
+- **`websearch_to_tsquery`, never `to_tsquery`.** The input is whatever someone
+  typed into a box. `to_tsquery` raises a syntax error on a stray `!`, an
+  unbalanced quote or a bare `&`, turning ordinary typing into a 500. websearch
+  never throws and gives `"quoted phrases"` and `-exclusion` for free.
+
+Known limits, both covered by tests so they fail loudly if they ever change:
+
+- **A body stashed in R2 is not searchable.** Oversized bodies are replaced in
+  the column by an `r2:oversized-email-part/...` pointer, so the indexed text is
+  the pointer, not the message.
+- **Stopwords match nothing.** Searching `the` returns zero results even though
+  the word is in every email, because the english config strips it. Looks like a
+  bug from the outside; it is not.
+
+**Snippets are not HTML-safe to inject.** `ts_headline` wraps matches in `<mark>`
+but escapes nothing around them, and the surrounding text is attacker-controlled
+— anyone can send mail to these inboxes. `splitSnippetHighlights` parses out the
+markers and `SearchSnippet` renders the pieces as React text nodes. **Never**
+switch that to `dangerouslySetInnerHTML`.
+
 ## Seeding dev
 
 The dev clone is routinely empty — it was empty when drizzle-kit landed, and
@@ -442,6 +500,11 @@ and `withApiToken` is what actually guards them.
 website-only on purpose — that dropdown restricts it to addresses that have
 already mailed the inbox.
 
+`GET /v1/search?q=` was added with search. It takes the same query syntax as the
+website box and returns `rank` and a `snippet` per hit, with matches wrapped in
+`<mark>` for the client to strip or restyle. The Rust CLI has no `search`
+subcommand for it yet.
+
 Test it with the real CLI rather than curl:
 
 ```bash
@@ -450,8 +513,31 @@ EMAILS_API_URL=http://localhost:8787 EMAILS_API_TOKEN=<token> emails inboxes
 
 ## Testing
 
-No test suite yet. Verification is `pnpm typecheck` and driving the app with
-the Playwright MCP.
+```bash
+pnpm test        # node --test, against the seeded dev database
+pnpm typecheck   # next typegen + wrangler types + tsc --noEmit
+```
+
+`pnpm test` uses Node's built-in test runner and TypeScript stripping — no
+vitest, no jest, no config file. Tests are `*.test.ts` beside the code they
+cover.
+
+**The search tests need a seeded database**: run `pnpm db:seed:dev -- --reset`
+first. They are deliberately end-to-end — a real postgres.js client against the
+real dev database, running the same `searchEmails` the website calls, asserting
+on rows Postgres actually returned. They fail with an explicit message rather
+than a confusing assertion if the corpus is missing.
+
+Anything needing a browser is still `pnpm dev` plus the Playwright MCP, which
+launches **headed** here, so bring up a display first
+(`~/.agent/skills/display`).
+
+**`tsc` can fail on a route that plainly exists.** Next writes route types to
+both `.next/types/` and `.next/dev/types/`, and `tsconfig.json` includes both.
+`.next/dev/types/` is only refreshed by `next dev`, so if the dev server has not
+run since a route was added, its stale `AppRoutes` union shadows the fresh one
+and `PageProps<"/your-new-route">` errors with *"does not satisfy the constraint
+AppRoutes"*. Delete `.next/dev/types` or start the dev server.
 
 The Playwright MCP here launches **headed**, so bring up a display first
 (`~/.agent/skills/display`) — headless is not an option with this MCP config.

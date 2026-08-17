@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { listInboxesWithCounts } from "@/inbox/inboxQueries";
+import { EmailSearchBox } from "@/search/EmailSearchBox";
 import { SignOutButton } from "@clerk/nextjs";
 import { DialogTrigger } from "@radix-ui/react-dialog";
 import { CogIcon } from "lucide-react";
@@ -19,9 +20,10 @@ export default async function Home(props: PageProps<"/">) {
 
   return (
     <div className="space-y-4">
-      <header className="flex flex-row items-center justify-between">
-        <h1 className="text-2xl font-bold">Inboxes</h1>
-        <div className="flex items-center gap-4">
+      <header className="flex flex-row items-center justify-between gap-4">
+        <h1 className="shrink-0 text-2xl font-bold">Inboxes</h1>
+        <EmailSearchBox />
+        <div className="flex shrink-0 items-center gap-4">
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="outline" size="icon">
