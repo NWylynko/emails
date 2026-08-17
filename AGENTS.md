@@ -152,9 +152,34 @@ connection string again. It doesn't: the app only ever reaches Postgres through
 the `HYPERDRIVE` binding. `MIGRATIONS_DATABASE_URL` is used by drizzle-kit and
 the seeder, nothing else.
 
-It must point at the **unpooled** Neon endpoint — the host *without* `-pooler`.
-The pooled endpoint is pgbouncer in transaction mode; Hyperdrive talks to it for
-ordinary queries, but it is the wrong target for DDL.
+### Why a connection string exists at all
+
+The app never holds one — it reaches Postgres through the `HYPERDRIVE` binding,
+and Hyperdrive keeps the Neon password on Cloudflare's side. So why does
+drizzle-kit need `MIGRATIONS_DATABASE_URL`?
+
+**Because Hyperdrive is a Worker binding.** It exists only inside a running
+Worker. A CI build container or a laptop has nothing to connect *through*. And
+the password cannot be recovered to make a direct connection instead: the
+Cloudflare API omits it entirely (verified 2026-08-17 against the raw API — the
+field is absent, not redacted). So `MIGRATIONS_DATABASE_URL` is a second,
+*readable* copy of a credential that already exists but is write-only.
+
+**It is not because Hyperdrive or pooling breaks migrations.** That was assumed
+here originally and is wrong. Measured against Neon's pooled endpoint — the one
+Hyperdrive talks to — plain DDL, multi-statement transactions, generated
+columns, GIN indexes and `CREATE INDEX CONCURRENTLY` all work. Prefer the
+**unpooled** endpoint (host without `-pooler`) so a long migration does not
+occupy a pooled slot the running app is competing for, but it is a preference,
+not a requirement.
+
+The alternative that needs no copied credential is running migrations *inside*
+the Worker, where the binding already exists. It is genuinely possible, and the
+cost is not effort: migration SQL must be bundled into the build (Workers have
+no filesystem, and drizzle's migrator reads files from disk), it needs an
+authenticated route that can mutate the production schema, and it **inverts the
+safe ordering** — the new code goes live before the schema it depends on, so a
+deploy that adds a column 500s until the migrate call lands.
 
 **Migration `0000` is an idempotent baseline.** It describes the schema as it
 already existed when drizzle-kit was introduced, using `CREATE TABLE IF NOT
@@ -200,7 +225,7 @@ Consequences worth knowing before writing a migration:
   drop it.
 - **`MIGRATIONS_DATABASE_URL` must exist in Infisical's prod environment.**
   Without it the build fails with an explicit message from `drizzle.config.ts`.
-  It must be the unpooled endpoint.
+  Prefer the unpooled endpoint (see "Why a connection string exists at all").
 - Two builds racing could both run `migrate`. drizzle records applied migrations
   in `drizzle.__drizzle_migrations`, but takes no advisory lock, so avoid
   pushing twice in quick succession behind a long migration.

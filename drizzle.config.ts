@@ -15,9 +15,18 @@ import { defineConfig } from "drizzle-kit";
  * Hyperdrive cutover and was deleted with it; reviving the name would suggest
  * the running app reads a connection string again, which it must not.
  *
- * Point it at the **unpooled** Neon endpoint (no `-pooler` in the host). The
- * pooled endpoint is pgbouncer in transaction mode, which is what Hyperdrive
- * talks to for ordinary queries but is the wrong target for migrations.
+ * Prefer the **unpooled** Neon endpoint (no `-pooler` in the host), but this is
+ * a preference, not a requirement. Measured against the pooled endpoint: plain
+ * DDL, multi-statement transactions, generated columns, GIN indexes and even
+ * `CREATE INDEX CONCURRENTLY` all work. The reason to use the direct endpoint
+ * is that a long migration should not occupy a pooled connection slot the
+ * running app is competing for, and it is what Neon recommends.
+ *
+ * Note this is NOT why CI needs a connection string. CI needs one because
+ * Hyperdrive is a Worker binding — it does not exist outside a running Worker,
+ * so a build container has nothing to connect through, and Cloudflare will not
+ * return the origin password (verified against the raw API: the field is
+ * absent, not redacted).
  *
  * Migrations live under the database vertical rather than a root-level
  * `drizzle/` directory, so the schema and its history sit together.
@@ -44,7 +53,7 @@ if (!url && needsConnection) {
       "  pnpm db:migrate:dev    (dev clone)\n" +
       "  pnpm ci:migrate        (production — runs in Workers Builds)\n\n" +
       "If this failed in CI, the variable is missing from Infisical's prod environment.\n" +
-      "It must be the UNPOOLED Neon endpoint: the host WITHOUT '-pooler'."
+      "Prefer the unpooled Neon endpoint: the host without '-pooler'."
   );
 }
 
