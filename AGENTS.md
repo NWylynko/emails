@@ -168,6 +168,15 @@ complete schema in a freshly created empty database.
 Hand-editing a generated `.sql` does **not** break future diffs — drizzle-kit
 compares `meta/*_snapshot.json`, not the SQL text.
 
+**drizzle-kit silently drops indexes when a generated column changes.** Altering
+the expression on `emails.search` makes it emit `DROP COLUMN` + `ADD COLUMN`,
+and dropping a column drops every index on it. Its snapshot still believes
+`emailSearchIdx` exists, so it emits nothing to rebuild it. Nothing errors —
+search keeps working on a sequential scan, and the missing index only shows up
+as a performance cliff once the corpus grows. Migration `0002` hit exactly this
+and re-creates the index by hand. **Check `pg_indexes` after any migration that
+touches a generated column.**
+
 ### Production migrations run in CI
 
 `pnpm ci:build` runs `pnpm ci:migrate` before it builds, so a push to `main`
@@ -248,7 +257,17 @@ Three things here are load-bearing and easy to break:
   unbalanced quote or a bare `&`, turning ordinary typing into a 500. websearch
   never throws and gives `"quoted phrases"` and `-exclusion` for free.
 
-Known limits, both covered by tests so they fail loudly if they ever change:
+**The sender is indexed twice on purpose.** Postgres' parser emits an email
+address as a single `email` token, so `noreply@github.com` yields the one lexeme
+`'noreply@github.com'` and never `'github'`. Before this was handled, searching
+"github" returned **0 hits against 29 emails from GitHub**, and "cloudflare" 0
+against 38 — found by driving the real UI, not by the unit tests, which only
+asserted on fixture tokens. The address is therefore indexed whole *and* again
+with `@ . _ -` translated to spaces. `to` is deliberately left out: it is the
+inbox name, so indexing it would make a search for an inbox return that entire
+inbox.
+
+Known limits, all covered by tests so they fail loudly if they ever change:
 
 - **A body stashed in R2 is not searchable.** Oversized bodies are replaced in
   the column by an `r2:oversized-email-part/...` pointer, so the indexed text is
@@ -256,6 +275,9 @@ Known limits, both covered by tests so they fail loudly if they ever change:
 - **Stopwords match nothing.** Searching `the` returns zero results even though
   the word is in every email, because the english config strips it. Looks like a
   bug from the outside; it is not.
+- **`-exclusion` on a partial address does not work.** `refund -etsy` will not
+  drop mail from `help@etsy.com`, because the negated term has to match a whole
+  lexeme. `refund -help@etsy.com` does work. Body-term exclusion is unaffected.
 
 **Snippets are not HTML-safe to inject.** `ts_headline` wraps matches in `<mark>`
 but escapes nothing around them, and the surrounding text is attacker-controlled

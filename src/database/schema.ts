@@ -20,7 +20,23 @@ const tsvector = customType<{ data: string; driverData: string }>({
  * Weighted so a hit in the subject outranks a hit buried in the body:
  * A = subject, B = sender, C = body.
  *
- * Two details are load-bearing:
+ * The sender is indexed **twice, deliberately**. Postgres' parser treats an
+ * email address as a single `email` token, so `noreply@github.com` produces the
+ * one lexeme `'noreply@github.com'` and never `'github'` — which means
+ * searching a sender's name or domain finds nothing at all. Measured on the
+ * seeded corpus before this was added: "github" returned 0 hits against 29
+ * emails from GitHub, "cloudflare" 0 against 38.
+ *
+ * So the address goes in whole (exact-address search keeps working) and again
+ * with `@`, `.`, `_` and `-` translated to spaces, which yields `noreply`,
+ * `github` and `com` as separate lexemes. `translate` is IMMUTABLE, so it is
+ * legal in a stored generated column.
+ *
+ * `to` is deliberately NOT indexed: it is the inbox name, every message in an
+ * inbox shares it, and searching one would just return the whole inbox. Scoping
+ * by inbox is a filter on the column instead.
+ *
+ * Two more details are load-bearing:
  *
  * - **`to_tsvector` must be given an explicit `'english'`.** The single-argument
  *   form depends on the session's `default_text_search_config` and is therefore
@@ -40,6 +56,7 @@ const tsvector = customType<{ data: string; driverData: string }>({
 const emailSearchExpression = sql`
   setweight(to_tsvector('english', coalesce("subject", '')), 'A') ||
   setweight(to_tsvector('english', coalesce("from", '')), 'B') ||
+  setweight(to_tsvector('english', translate(coalesce("from", ''), '@._-', '    ')), 'B') ||
   setweight(to_tsvector('english', left("body", 200000)), 'C')
 `;
 
