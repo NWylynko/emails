@@ -553,6 +553,12 @@ pnpm typecheck   # next typegen + wrangler types + tsc --noEmit
 vitest, no jest, no config file. Tests are `*.test.ts` beside the code they
 cover.
 
+The glob in that script is **quoted on purpose**, so Node expands it rather than
+the shell. `sh` has no `globstar`, so an unquoted `src/**/*.test.ts` matches only
+one directory deep and silently skips anything nested — a test suite that
+quietly stops running half its tests. Verified: unquoted, a file at
+`src/search/deep/nested.test.ts` is never discovered.
+
 **The search tests need a seeded database**: run `pnpm db:seed:dev -- --reset`
 first. They are deliberately end-to-end — a real postgres.js client against the
 real dev database, running the same `searchEmails` the website calls, asserting
