@@ -199,6 +199,12 @@ before any external engine.
 Weighting is A=subject, B=sender, C=body, so a subject hit outranks the same
 term buried in a body.
 
+**Never write a bare `.select()` against `emails`.** Drizzle expands it to every
+column in the schema, which now includes the `search` tsvector — hundreds of
+kilobytes on a large message, fetched on every read, for a value no caller can
+use. `getEmailById` did exactly that and was fixed when search landed. List
+columns explicitly.
+
 Three things here are load-bearing and easy to break:
 
 - **`to_tsvector` must be passed an explicit `'english'`.** The one-argument

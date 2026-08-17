@@ -16,9 +16,24 @@ function attachmentsBucket() {
   return getCloudflareContext().env.ATTACHMENTS;
 }
 
+/**
+ * Never write `.select()` bare against `emails`. Drizzle expands it to every
+ * column in the schema, which now includes the generated `search` tsvector —
+ * hundreds of kilobytes on a large message, pulled across the wire on every
+ * read, for a value no caller can use. Body and html are excluded for the same
+ * reason: callers that want them go through `readEmailBody` / `readEmailHtml`,
+ * which resolve `r2:` pointers.
+ */
 export async function getEmailById(emailId: number) {
   const [email] = await getEmailsDb()
-    .select()
+    .select({
+      emailId: emails.emailId,
+      from: emails.from,
+      to: emails.to,
+      subject: emails.subject,
+      timestamp: emails.timestamp,
+      viewed: emails.viewed,
+    })
     .from(emails)
     .where(driz.eq(emails.emailId, emailId));
 
