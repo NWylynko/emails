@@ -29,7 +29,12 @@ if (process.env.NODE_ENV === "development") {
 const withVarlock = varlockNextConfigPlugin();
 
 const nextConfig = {
-  allowedDevOrigins: ["127.0.0.1", "localhost", "remote-box"],
+  allowedDevOrigins: [
+    "127.0.0.1",
+    "localhost",
+    "remote-box",
+    "remote-box.daggertooth-bull.ts.net",
+  ],
   // Leave the bottom-left website editor reachable during local development.
   devIndicators: { position: "bottom-right" },
   // Local pnpm links must be inside Turbopack's filesystem root. Both this app

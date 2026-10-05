@@ -20,11 +20,19 @@ The browser connects directly to the private T3 endpoint. It must have Tailscale
 access, and T3 must allow the website's origin. The widget inherits the project's
 model and permission settings. Its credential route never connects to T3.
 
-For local access through either `localhost:3002` or `remote-box:3002`, start the
-existing T3 environment with both origins allowed:
+For HTTPS access on your tailnet, keep the emails dev server on port 3002 and
+serve it through a separate HTTPS port:
 
 ```sh
-T3CODE_DEV_ALLOWED_ORIGINS=http://localhost:3002,http://remote-box:3002 npx t3@latest --host 127.0.0.1 --port 3773 --mode web --no-browser --dev-url https://remote-box.daggertooth-bull.ts.net:3773 --tailscale-serve --tailscale-serve-port 3773
+tailscale serve --bg --https=8444 http://127.0.0.1:3002
+```
+
+Open `https://remote-box.daggertooth-bull.ts.net:8444`. Next's `allowedDevOrigins`
+includes that hostname. Start the existing T3 environment with the HTTPS origin
+and both local HTTP origins allowed:
+
+```sh
+T3CODE_DEV_ALLOWED_ORIGINS=http://localhost:3002,http://remote-box:3002,https://remote-box.daggertooth-bull.ts.net:8444 npx t3@latest --host 127.0.0.1 --port 3773 --mode web --no-browser --dev-url https://remote-box.daggertooth-bull.ts.net:3773 --tailscale-serve --tailscale-serve-port 3773
 ```
 
 Changing this list requires a T3 restart. Keep its existing `--dev-url` to retain
