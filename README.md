@@ -20,6 +20,18 @@ The browser connects directly to the private T3 endpoint. It must have Tailscale
 access, and T3 must allow the website's origin. The widget inherits the project's
 model and permission settings. Its credential route never connects to T3.
 
+For local access through either `localhost:3002` or `remote-box:3002`, start the
+existing T3 environment with both origins allowed:
+
+```sh
+T3CODE_DEV_ALLOWED_ORIGINS=http://localhost:3002,http://remote-box:3002 npx t3@latest --host 127.0.0.1 --port 3773 --mode web --no-browser --dev-url https://remote-box.daggertooth-bull.ts.net:3773 --tailscale-serve --tailscale-serve-port 3773
+```
+
+Changing this list requires a T3 restart. Keep its existing `--dev-url` to retain
+this environment's history. Each additional website hostname, scheme, or port
+needs its own exact origin; a successful HTTP response without the matching
+`Access-Control-Allow-Origin` header still fails in the browser.
+
 Rebuild `../t3-chat-widget` after package changes. The linked package uses this
 app's React peers, and Turbopack's root includes both repositories. See the
 [package setup and credential limitations](../t3-chat-widget/README.md).
