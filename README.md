@@ -3,6 +3,12 @@
 Private email website built with Next.js and Cloudflare Workers. Run `pnpm dev`
 with the configured Infisical dev environment; deployments use Workers Builds.
 
+The homepage shows each inbox's latest email, including its sender, subject and
+body preview. Use **Open latest** to read it directly, or the inbox address to
+view all messages. Check this flow against the running dev server on port 3002
+with `pnpm test:homepage` (install Chromium once with
+`pnpm exec playwright install chromium --only-shell`).
+
 ## Local website editor
 
 The authenticated layout includes the locally linked `@wylynko/t3-chat-widget`

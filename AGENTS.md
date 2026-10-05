@@ -243,6 +243,27 @@ Consequences worth knowing before writing a migration:
 `pnpm db:migrate:prod` still exists for applying a migration by hand, but the
 normal path is to let CI do it.
 
+## Homepage previews
+
+`listInboxesWithLatestEmail()` in `src/inbox/inboxQueries.ts` supplies the homepage.
+It joins inbox counts to one latest email per inbox in a single SQL query, ordered
+by received timestamp and then email ID to make timestamp ties deterministic.
+Only inboxes with mail appear, as before. `/v1/inboxes` keeps its existing summary
+response through `listInboxesWithCounts()`.
+
+Normal body reads are limited to 1,000 characters in SQL, then whitespace is
+collapsed and the displayed preview is capped at 240 characters. Oversized-body
+R2 pointers are resolved before generating the preview. Email content is rendered
+as React text. The inbox address opens the full inbox; “Open latest” goes straight
+to the latest email with `prefetch={false}`, because the email layout marks it read.
+
+`pnpm test:homepage` runs a headless Playwright browser against the already-running
+dev server on `http://localhost:3002`. It creates isolated mail fixtures in the
+known dev database, signs in with a short-lived dev Clerk ticket, checks previews,
+ordering, direct navigation, unread counts and mobile layout, then deletes its
+fixtures. Install its browser once with `pnpm exec playwright install chromium
+--only-shell`. It is separate from `pnpm test`, which needs no running website.
+
 ## Search
 
 Full-text search over received mail, in Postgres. **There is no search service
