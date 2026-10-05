@@ -5,7 +5,7 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  '@next/env': npm:@varlock/nextjs-integration
+  '@next/env': npm:@varlock/nextjs-integration@1.2.0
 
 importers:
 
@@ -38,6 +38,9 @@ importers:
       '@radix-ui/react-tabs':
         specifier: ^1.1.21
         version: 1.1.21(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@wylynko/t3-chat-widget':
+        specifier: link:../t3-chat-widget
+        version: link:../t3-chat-widget
       autoprefixer:
         specifier: ^10.5.4
         version: 10.5.4(postcss@8.5.26)
@@ -101,6 +104,9 @@ importers:
       resend:
         specifier: ^6.18.1
         version: 6.18.1
+      server-only:
+        specifier: 0.0.1
+        version: 0.0.1
       sonner:
         specifier: ^2.0.8
         version: 2.0.8(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)

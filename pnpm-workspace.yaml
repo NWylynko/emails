@@ -14,7 +14,7 @@ minimumReleaseAge: 4320
 # varlock's Next.js integration works by replacing Next's own env loader.
 # Required by @varlock/nextjs-integration; overrides are read from here.
 overrides:
-  "@next/env": "npm:@varlock/nextjs-integration"
+  "@next/env": "npm:@varlock/nextjs-integration@1.2.0"
 
 minimumReleaseAgeExclude:
   - lucide-react@1.31.0

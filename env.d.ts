@@ -30,6 +30,35 @@ export type CoercedEnvSchema = {
   CLERK_SECRET_KEY: string;
   
   /**
+   * **T3_CHAT_EDITOR_USER_IDS** 🔐 _sensitive_  
+   * Explicit comma-separated Clerk user IDs allowed to edit this website through  
+   * T3. Empty disables the widget; ordinary website access does not grant editing.  
+   * ![icon](data:image/svg+xml;utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2220%22%20height%3D%2220%22%20viewBox%3D%220%200%2032%2032%22%3E%3Cpath%20fill%3D%22%23808080%22%20d%3D%22M29%2022h-5a2.003%202.003%200%200%201-2-2v-6a2%202%200%200%201%202-2h5v2h-5v6h5ZM18%2012h-4V8h-2v14h6a2.003%202.003%200%200%200%202-2v-6a2%202%200%200%200-2-2m-4%208v-6h4v6Zm-6-8H3v2h5v2H4a2%202%200%200%200-2%202v2a2%202%200%200%200%202%202h6v-8a2%202%200%200%200-2-2m0%208H4v-2h4Z%22%2F%3E%3C%2Fsvg%3E)   
+   */
+  T3_CHAT_EDITOR_USER_IDS?: string;
+  
+  /**
+   * **T3_CHAT_SERVER_URL** 🔐 _sensitive_  
+   * Private HTTPS T3 origin, delivered only to an authorized editor on opening chat.  
+   * ![icon](data:image/svg+xml;utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2220%22%20height%3D%2220%22%20viewBox%3D%220%200%2032%2032%22%3E%3Cpath%20fill%3D%22%23808080%22%20d%3D%22M29%2022h-5a2.003%202.003%200%200%201-2-2v-6a2%202%200%200%201%202-2h5v2h-5v6h5ZM18%2012h-4V8h-2v14h6a2.003%202.003%200%200%200%202-2v-6a2%202%200%200%200-2-2m-4%208v-6h4v6Zm-6-8H3v2h5v2H4a2%202%200%200%200-2%202v2a2%202%200%200%200%202%202h6v-8a2%202%200%200%200-2-2m0%208H4v-2h4Z%22%2F%3E%3C%2Fsvg%3E)   
+   */
+  T3_CHAT_SERVER_URL?: string;
+  
+  /**
+   * **T3_CHAT_ACCESS_TOKEN** 🔐 _sensitive_  
+   * Pre-issued T3 bearer. Read inside the authorized request, never from layout props.  
+   * ![icon](data:image/svg+xml;utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2220%22%20height%3D%2220%22%20viewBox%3D%220%200%2032%2032%22%3E%3Cpath%20fill%3D%22%23808080%22%20d%3D%22M29%2022h-5a2.003%202.003%200%200%201-2-2v-6a2%202%200%200%201%202-2h5v2h-5v6h5ZM18%2012h-4V8h-2v14h6a2.003%202.003%200%200%200%202-2v-6a2%202%200%200%200-2-2m-4%208v-6h4v6Zm-6-8H3v2h5v2H4a2%202%200%200%200-2%202v2a2%202%200%200%200%202%202h6v-8a2%202%200%200%200-2-2m0%208H4v-2h4Z%22%2F%3E%3C%2Fsvg%3E)   
+   */
+  T3_CHAT_ACCESS_TOKEN?: string;
+  
+  /**
+   * **T3_CHAT_PROJECT_ID** 🔐 _sensitive_  
+   * ID of this website's existing project in the configured T3 environment.  
+   * ![icon](data:image/svg+xml;utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2220%22%20height%3D%2220%22%20viewBox%3D%220%200%2032%2032%22%3E%3Cpath%20fill%3D%22%23808080%22%20d%3D%22M29%2022h-5a2.003%202.003%200%200%201-2-2v-6a2%202%200%200%201%202-2h5v2h-5v6h5ZM18%2012h-4V8h-2v14h6a2.003%202.003%200%200%200%202-2v-6a2%202%200%200%200-2-2m-4%208v-6h4v6Zm-6-8H3v2h5v2H4a2%202%200%200%200-2%202v2a2%202%200%200%200%202%202h6v-8a2%202%200%200%200-2-2m0%208H4v-2h4Z%22%2F%3E%3C%2Fsvg%3E)   
+   */
+  T3_CHAT_PROJECT_ID?: string;
+  
+  /**
    * **NEXT_PUBLIC_CLERK_SIGN_IN_URL**  
    * Static routing config, safe for the browser. The value here IS the default —  
    * there is no fallback in code.  
@@ -158,11 +187,11 @@ export type CoercedEnvSchema = {
   
 };
 
-type _CoercedEnvSchema_76477716 = CoercedEnvSchema;
+type _CoercedEnvSchema_03bb19ec = CoercedEnvSchema;
 
 declare module 'varlock/env' {
-  export interface TypedEnvSchema extends Readonly<_CoercedEnvSchema_76477716> {}
-  export interface PublicTypedEnvSchema extends Readonly<Pick<_CoercedEnvSchema_76477716, 'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY' | 'NEXT_PUBLIC_CLERK_SIGN_IN_URL' | 'PUSHER_KEY' | 'PUSHER_CLUSTER' | 'BEAMS_INSTANCE_ID' | 'NEXTJS_ENV'>> {}
+  export interface TypedEnvSchema extends Readonly<_CoercedEnvSchema_03bb19ec> {}
+  export interface PublicTypedEnvSchema extends Readonly<Pick<_CoercedEnvSchema_03bb19ec, 'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY' | 'NEXT_PUBLIC_CLERK_SIGN_IN_URL' | 'PUSHER_KEY' | 'PUSHER_CLUSTER' | 'BEAMS_INSTANCE_ID' | 'NEXTJS_ENV'>> {}
 }
 
 
@@ -172,17 +201,17 @@ export type EnvSchemaAsStrings = {
       : (CoercedEnvSchema[Property] extends boolean ? ('true' | 'false') : string)
 };
 
-type _EnvSchemaAsStrings_76477716 = EnvSchemaAsStrings;
+type _EnvSchemaAsStrings_03bb19ec = EnvSchemaAsStrings;
 declare global {
 
   // add types for global import.meta.env
-  interface ImportMetaEnv extends _EnvSchemaAsStrings_76477716 {}
+  interface ImportMetaEnv extends _EnvSchemaAsStrings_03bb19ec {}
   interface ImportMeta {
     readonly env: ImportMetaEnv;
   }
 
   // add types for global process.env
   namespace NodeJS {
-    interface ProcessEnv extends _EnvSchemaAsStrings_76477716 {}
+    interface ProcessEnv extends _EnvSchemaAsStrings_03bb19ec {}
   }
 }

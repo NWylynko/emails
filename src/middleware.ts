@@ -2,21 +2,22 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
 /**
- * `/v1` is public *to Clerk* only — it carries its own Bearer-token check in
- * `src/api/authorizeApiToken.ts`. emails-cli sends a token, not a session
- * cookie, so leaving it behind the Clerk gate turns every CLI call into a 307
- * to /sign-in.
+ * These API routes run their own authorization. `/v1` checks its Bearer token;
+ * `/api/t3-chat` checks the authenticated Clerk user against the editor allowlist.
+ * Clerk still initializes the session, while each handler returns a JSON denial
+ * instead of a sign-in redirect.
  */
 const isPublicRoute = createRouteMatcher([
   "/sign-in(.*)",
   "/authenticate(.*)",
   "/v1(.*)",
+  "/api/t3-chat",
 ]);
 
 const allowedUserIds = Object.freeze([
   "user_2t6gJSoy2au2IcsGdNGFt32ZyQL",
   "user_2t6im88Xhr78qDRQ4IKOZ1Ee146",
-  "user_3BaG0aVrzwkbCojh27ulpqFDleg"
+  "user_3BaG0aVrzwkbCojh27ulpqFDleg",
 ]);
 
 export default clerkMiddleware(async (auth, request) => {
@@ -28,13 +29,13 @@ export default clerkMiddleware(async (auth, request) => {
 
   if (userId === null) {
     return NextResponse.redirect(
-      new URL("/sign-in", request.nextUrl).toString()
+      new URL("/sign-in", request.nextUrl).toString(),
     );
   }
 
   if (allowedUserIds.includes(userId) === false) {
     return NextResponse.redirect(
-      new URL("/sign-in", request.nextUrl).toString()
+      new URL("/sign-in", request.nextUrl).toString(),
     );
   }
 

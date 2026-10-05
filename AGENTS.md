@@ -1,3 +1,5 @@
+keep this file up to date
+
 # AGENTS.md
 
 Keep this file up to date.
@@ -741,3 +743,17 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+## Embedded website editor
+
+The local `@wylynko/t3-chat-widget` link points to `../t3-chat-widget`, an independent
+repository. Rebuild its `dist` after edits; keep its React peers linked to emails.
+`next.config.ts` gives Turbopack a shared parent root and moves the dev indicator
+away from the editor launcher. `/api/t3-chat` bypasses Clerk's redirect middleware
+but authorizes every credential POST against the separate editor allowlist.
+
+Only the dev Infisical environment has widget credentials. No npm release or
+production rollout is authorized in this milestone. The four private widget
+variables deliberately allow authorized response delivery via per-item varlock
+`preventLeaks=false`; global leak protection and log redaction stay enabled.
+Run `src/t3-chat/credentialRoute.test.ts` to verify both policies with real varlock.

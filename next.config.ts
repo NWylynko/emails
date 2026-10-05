@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 import { initOpenNextCloudflareForDev } from "@opennextjs/cloudflare";
 import { varlockNextConfigPlugin } from "@varlock/nextjs-integration/plugin";
+import { resolve } from "node:path";
 
 // Gives plain `next dev` access to the Worker bindings (HYPERDRIVE, ATTACHMENTS,
 // AI) through miniflare, so `getCloudflareContext()` works without a full
@@ -29,6 +30,11 @@ const withVarlock = varlockNextConfigPlugin();
 
 const nextConfig = {
   allowedDevOrigins: ["127.0.0.1", "localhost", "remote-box"],
+  // Leave the bottom-left website editor reachable during local development.
+  devIndicators: { position: "bottom-right" },
+  // Local pnpm links must be inside Turbopack's filesystem root. Both this app
+  // and the standalone widget repository live below the same parent directory.
+  turbopack: { root: resolve(__dirname, "..") },
 } satisfies NextConfig;
 
 export default withVarlock(nextConfig);

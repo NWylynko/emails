@@ -23,4 +23,8 @@ interface CloudflareEnv {
   PUSHER_SECRET: string;
   RESEND_KEY: string;
   TECHULUS_API_KEY: string;
+  T3_CHAT_EDITOR_USER_IDS?: string;
+  T3_CHAT_SERVER_URL?: string;
+  T3_CHAT_ACCESS_TOKEN?: string;
+  T3_CHAT_PROJECT_ID?: string;
 }
