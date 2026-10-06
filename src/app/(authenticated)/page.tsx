@@ -49,13 +49,13 @@ export default async function Home(props: PageProps<"/">) {
         {inboxes.map((inbox) => (
           <li
             key={inbox.to}
-            className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+            className="relative flex flex-col gap-2 px-4 py-3 hover:bg-zinc-50 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
           >
             <div className="min-w-0 flex-1 space-y-1">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                 <Link
                   href={`/inbox/${encodeURIComponent(inbox.to)}`}
-                  className="min-w-0 max-w-full truncate font-medium hover:underline"
+                  className="min-w-0 max-w-full truncate font-medium after:absolute after:inset-0 hover:underline focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-zinc-500"
                 >
                   {inbox.to}
                 </Link>
@@ -88,7 +88,7 @@ export default async function Home(props: PageProps<"/">) {
               asChild
               variant="outline"
               size="sm"
-              className="self-start sm:shrink-0 sm:self-center"
+              className="relative z-10 self-start sm:shrink-0 sm:self-center"
             >
               <Link href={`/email/${inbox.emailId}`} prefetch={false}>
                 Open latest

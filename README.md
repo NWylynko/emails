@@ -4,8 +4,8 @@ Private email website built with Next.js and Cloudflare Workers. Run `pnpm dev`
 with the configured Infisical dev environment; deployments use Workers Builds.
 
 The homepage shows compact inbox rows with the latest subject, time and mail
-counts. Use **Open latest** to read it directly, or the inbox address to
-view all messages. Check this flow against the running dev server on port 3002
+counts. Click anywhere on an inbox row to view all messages, or use **Open latest**
+to read its newest email directly. Check this flow against the running dev server on port 3002
 with `pnpm test:homepage` (install Chromium once with
 `pnpm exec playwright install chromium --only-shell`).
 

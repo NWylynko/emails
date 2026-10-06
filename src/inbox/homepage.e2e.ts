@@ -113,6 +113,15 @@ test("compact inbox previews show the newest subject and open it directly", asyn
 
   const latestLink = inboxRow.getByRole("link", { name: /Open latest/ });
   await expect(latestLink).toHaveAttribute("href", `/email/${latestEmailId}`);
+  await inboxRow.click({ position: { x: 4, y: 4 } });
+  await page.waitForURL(
+    `${homepageUrl}/inbox/${encodeURIComponent(testInbox)}`,
+    { timeout: 5000 },
+  );
+  await expect(
+    page.getByText("Older homepage message", { exact: true }),
+  ).toBeVisible();
+  await page.goto(homepageUrl);
   await page.reload();
   await expect(inboxRow).toContainText("1 unread");
   await latestLink.click();
@@ -147,5 +156,19 @@ test("compact inbox previews show the newest subject and open it directly", asyn
     ),
     false,
     "The homepage fits a mobile viewport without horizontal scrolling",
+  );
+  const mobileRowBounds = (await inboxRow.boundingBox())!;
+  const mobileSubjectBounds = (await inboxRow
+    .getByText("Latest homepage message", { exact: true })
+    .boundingBox())!;
+  await inboxRow.click({
+    position: {
+      x: mobileSubjectBounds.x - mobileRowBounds.x + 4,
+      y: mobileSubjectBounds.y - mobileRowBounds.y + 4,
+    },
+  });
+  await page.waitForURL(
+    `${homepageUrl}/inbox/${encodeURIComponent(testInbox)}`,
+    { timeout: 5000 },
   );
 });

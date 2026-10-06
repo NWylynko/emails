@@ -256,6 +256,8 @@ time. The homepage query does not fetch senders or bodies or resolve R2 objects.
 Subjects render as React text and long addresses and subjects truncate to keep rows
 compact. The inbox address opens the full inbox; “Open latest” goes straight to the
 latest email with `prefetch={false}`, because the email layout marks it read.
+The inbox link's CSS pseudo-element covers the whole row; the latest-email button
+is positioned above it so both destinations remain native, keyboard-accessible links.
 The homepage loading skeleton mirrors the search header and compact two-line rows,
 including the mobile placement of the latest-email button.
 
