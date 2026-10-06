@@ -9,8 +9,6 @@
 import * as driz from "drizzle-orm";
 import { getEmailsDb } from "@/database";
 import { emails, inboxes } from "@/database/schema";
-import { getCloudflareContext } from "@opennextjs/cloudflare";
-import { resolveOversizedEmailPart } from "@/email/stashOversizedEmailPart";
 
 export type InboxSummary = {
   to: string;
@@ -43,7 +41,7 @@ export async function listInboxesWithCounts(): Promise<InboxSummary[]> {
   }));
 }
 
-/** Homepage previews; keep full bodies and search vectors out of the list query. */
+/** Compact homepage previews; only fetch the latest subject, time and link. */
 export async function listInboxesWithLatestEmail() {
   const db = getEmailsDb();
   const counts = db
@@ -61,10 +59,8 @@ export async function listInboxesWithLatestEmail() {
   const latestEmail = db
     .select({
       emailId: emails.emailId,
-      from: emails.from,
       subject: emails.subject,
       timestamp: emails.timestamp,
-      body: driz.sql<string>`left(${emails.body}, 1000)`.as("body"),
     })
     .from(emails)
     .where(driz.eq(emails.to, counts.to))
@@ -72,32 +68,18 @@ export async function listInboxesWithLatestEmail() {
     .limit(1)
     .as("latestEmail");
 
-  const rows = await db
+  return db
     .select({
       to: counts.to,
       total: counts.total,
       unread: counts.unread,
       emailId: latestEmail.emailId,
-      from: latestEmail.from,
       subject: latestEmail.subject,
       timestamp: latestEmail.timestamp,
-      body: latestEmail.body,
     })
     .from(counts)
     .innerJoinLateral(latestEmail, driz.sql`true`)
     .orderBy(driz.desc(latestEmail.timestamp), driz.desc(latestEmail.emailId));
-
-  const bucket = getCloudflareContext().env.ATTACHMENTS;
-  return Promise.all(
-    rows.map(async ({ body, ...inbox }) => {
-      const text = await resolveOversizedEmailPart(bucket, body);
-      const preview = text!.replace(/\s+/g, " ").trim();
-      return {
-        ...inbox,
-        preview: preview.length > 240 ? `${preview.slice(0, 240)}…` : preview,
-      };
-    }),
-  );
 }
 
 export type InboxEmailFilters = {

@@ -251,11 +251,11 @@ by received timestamp and then email ID to make timestamp ties deterministic.
 Only inboxes with mail appear, as before. `/v1/inboxes` keeps its existing summary
 response through `listInboxesWithCounts()`.
 
-Normal body reads are limited to 1,000 characters in SQL, then whitespace is
-collapsed and the displayed preview is capped at 240 characters. Oversized-body
-R2 pointers are resolved before generating the preview. Email content is rendered
-as React text. The inbox address opens the full inbox; “Open latest” goes straight
-to the latest email with `prefetch={false}`, because the email layout marks it read.
+Rows show the inbox address, mail counts and a single-line latest subject with its
+time. The homepage query does not fetch senders or bodies or resolve R2 objects.
+Subjects render as React text and long addresses and subjects truncate to keep rows
+compact. The inbox address opens the full inbox; “Open latest” goes straight to the
+latest email with `prefetch={false}`, because the email layout marks it read.
 
 `pnpm test:homepage` runs a headless Playwright browser against the already-running
 dev server on `http://localhost:3002`. It creates isolated mail fixtures in the

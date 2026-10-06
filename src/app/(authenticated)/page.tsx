@@ -49,13 +49,13 @@ export default async function Home(props: PageProps<"/">) {
         {inboxes.map((inbox) => (
           <li
             key={inbox.to}
-            className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6"
+            className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
           >
-            <div className="min-w-0 flex-1 space-y-2">
+            <div className="min-w-0 flex-1 space-y-1">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                 <Link
                   href={`/inbox/${encodeURIComponent(inbox.to)}`}
-                  className="min-w-0 break-all font-medium hover:underline"
+                  className="min-w-0 max-w-full truncate font-medium hover:underline"
                 >
                   {inbox.to}
                 </Link>
@@ -71,21 +71,18 @@ export default async function Home(props: PageProps<"/">) {
                   {inbox.total} {inbox.total === 1 ? "email" : "emails"}
                 </span>
               </div>
-              <p className="truncate font-semibold">
-                {inbox.subject || "(no subject)"}
-              </p>
-              <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
-                <span className="min-w-0 break-all">{inbox.from}</span>
+              <div className="flex min-w-0 items-center gap-3">
+                <p className="min-w-0 flex-1 truncate text-sm text-gray-600">
+                  {inbox.subject || "(no subject)"}
+                </p>
                 <time
+                  className="shrink-0 text-xs text-gray-500"
                   dateTime={inbox.timestamp.toISOString()}
                   title={inbox.timestamp.toLocaleString()}
                 >
                   {formatDistanceToNow(inbox.timestamp, { addSuffix: true })}
                 </time>
               </div>
-              <p className="line-clamp-2 break-words text-sm text-gray-600">
-                {inbox.preview}
-              </p>
             </div>
             <Button
               asChild

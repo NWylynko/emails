@@ -82,7 +82,7 @@ after(async () => {
   }
 });
 
-test("each inbox previews its newest email and opens it directly", async () => {
+test("compact inbox previews show the newest subject and open it directly", async () => {
   const inboxLink = page.getByRole("link", { name: testInbox });
   await expect(inboxLink).toBeVisible();
   await expect(
@@ -90,10 +90,8 @@ test("each inbox previews its newest email and opens it directly", async () => {
   ).toBeVisible();
   const inboxRow = page.getByRole("listitem").filter({ has: inboxLink });
   await expect(inboxRow).toContainText("Latest homepage message");
-  await expect(inboxRow).toContainText("newest@preview.test");
-  await expect(inboxRow).toContainText(
-    "Your verification code is 482901. Use it to finish signing in.",
-  );
+  await expect(inboxRow).not.toContainText("newest@preview.test");
+  await expect(inboxRow).not.toContainText("Your verification code is 482901.");
   await expect(inboxRow).not.toContainText(
     "This older body must not be previewed.",
   );
@@ -103,7 +101,11 @@ test("each inbox previews its newest email and opens it directly", async () => {
     has: page.getByRole("link", { name: secondInbox }),
   });
   await expect(otherRow).toContainText("Latest other inbox message");
-  await expect(otherRow).toContainText("Preview for the other inbox.");
+  await expect(otherRow).not.toContainText("Preview for the other inbox.");
+  assert.ok(
+    (await inboxRow.boundingBox())!.height <= 100,
+    "Desktop inbox previews fit in a compact row",
+  );
   assert.ok(
     (await inboxRow.boundingBox())!.y < (await otherRow.boundingBox())!.y,
     "Inboxes with newer mail appear first",
@@ -135,6 +137,10 @@ test("each inbox previews its newest email and opens it directly", async () => {
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto(homepageUrl);
   await expect(latestLink).toBeVisible();
+  assert.ok(
+    (await inboxRow.boundingBox())!.height <= 150,
+    "Mobile inbox previews stay compact even with a long inbox address",
+  );
   assert.equal(
     await page.evaluate(
       () => document.documentElement.scrollWidth > window.innerWidth,
