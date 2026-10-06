@@ -8,7 +8,9 @@ const inter = Inter({ subsets: ["latin"] });
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en">
-      <body className={`${inter.className} bg-white antialiased`}>
+      <body
+        className={`${inter.className} min-h-screen bg-linear-to-br from-purple-200 to-blue-200 bg-fixed antialiased`}
+      >
         <ClerkProvider>
           <main className="px-4 py-6">{children}</main>
           <Toaster />
