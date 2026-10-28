@@ -12,6 +12,7 @@
     "ci:build": "export INFISICAL_TOKEN=$(infisical login --method=universal-auth --silent --plain) && pnpm ci:migrate && opennextjs-cloudflare build --env=production",
     "test": "infisical run --env=dev -- node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test \"src/**/*.test.ts\"",
     "test:homepage": "infisical run --env=dev -- node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test src/inbox/homepage.e2e.ts",
+    "test:t3-chat-loading": "infisical run --env=dev -- node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test src/t3-chat/widgetLoading.e2e.ts",
     "db:generate": "drizzle-kit generate",
     "db:check": "drizzle-kit check",
     "db:migrate:dev": "infisical run --env=dev -- drizzle-kit migrate",

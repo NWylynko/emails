@@ -3,7 +3,6 @@ import { connection } from "next/server";
 import { ENV } from "varlock/env";
 import { getEmailsEditorUserId } from "@/t3-chat/authorizeEmailsEditor";
 import { EmailsT3ChatWidget } from "@/t3-chat/EmailsT3ChatWidget";
-import "@wylynko/t3-chat-widget/styles.css";
 
 export default async function AuthenticatedLayout(props: LayoutProps<"/">) {
   // Reading the Worker env means this cannot be prerendered — `connection()`

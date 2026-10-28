@@ -15,7 +15,7 @@ Use the installed `emails` binary. Config lives in `~/.config/emails-cli/config.
 
 | Setting | Value |
 |---------|-------|
-| Skill | `~/.agent/skills/emails/` |
+| Skill | `~/.agents/skills/emails/` |
 | Binary | `emails` (`~/.cargo/bin/emails`) |
 | API | `https://email-service.nick-dev.workers.dev` |
 | Domain | `wylynko.me` (catch-all — any local part works) |

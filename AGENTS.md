@@ -649,7 +649,7 @@ than a confusing assertion if the corpus is missing.
 
 Anything needing a browser is still `pnpm dev` plus the Playwright MCP, which
 launches **headed** here, so bring up a display first
-(`~/.agent/skills/display`).
+(`~/.agents/skills/display`).
 
 **`tsc` can fail on a route that plainly exists.** Next writes route types to
 both `.next/types/` and `.next/dev/types/`, and `tsconfig.json` includes both.
@@ -659,7 +659,7 @@ and `PageProps<"/your-new-route">` errors with *"does not satisfy the constraint
 AppRoutes"*. Delete `.next/dev/types` or start the dev server.
 
 The Playwright MCP here launches **headed**, so bring up a display first
-(`~/.agent/skills/display`) — headless is not an option with this MCP config.
+(`~/.agents/skills/display`) — headless is not an option with this MCP config.
 
 To get a signed-in browser, mint a Clerk ticket (single-use):
 
@@ -782,3 +782,10 @@ production rollout is authorized in this milestone. The four private widget
 variables deliberately allow authorized response delivery via per-item varlock
 `preventLeaks=false`; global leak protection and log redaction stay enabled.
 Run `src/t3-chat/credentialRoute.test.ts` to verify both policies with real varlock.
+
+Keep widget CSS out of the shared authenticated layout. `EmailsT3ChatWidget`
+checks the current Clerk identity before dynamically importing `LazyT3ChatWidget`
+with SSR disabled; that module loads the launcher and CSS together. The package
+keeps the conversation panel lazy until opened. `pnpm test:t3-chat-loading`
+checks initial route assets and the launcher against the existing dev server,
+using an isolated credential denial rather than Nick's live T3 environment.

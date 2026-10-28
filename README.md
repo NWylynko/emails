@@ -16,6 +16,11 @@ from `../t3-chat-widget`. It is visible only to Clerk users listed in
 `T3_CHAT_EDITOR_USER_IDS`; `/api/t3-chat` checks that permission on every request.
 Ordinary website access does not grant editing access.
 
+The server only mounts the editor for eligible users. Its small client boundary
+checks the current Clerk identity before loading the widget and its CSS together;
+ordinary users do not load those assets. The conversation panel stays lazy until
+opened (or restored open), and no credential request runs before then.
+
 The four optional private variables live in Infisical and are declared in
 `.env.schema`: `T3_CHAT_EDITOR_USER_IDS`, `T3_CHAT_SERVER_URL`,
 `T3_CHAT_ACCESS_TOKEN`, and `T3_CHAT_PROJECT_ID`. Leave the editor allowlist empty
@@ -55,3 +60,12 @@ Run the editor's integrated authorization and real-varlock tests with:
 ```sh
 node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test src/t3-chat/credentialRoute.test.ts
 ```
+
+Check lazy asset loading and the editor launcher against the existing dev server:
+
+```sh
+pnpm test:t3-chat-loading
+```
+
+This browser test uses a dev Clerk editor and intercepts the credential request,
+so it never connects to the live T3 environment.
