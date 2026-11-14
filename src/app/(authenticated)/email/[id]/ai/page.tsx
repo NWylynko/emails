@@ -10,17 +10,42 @@ import { linkifyText } from "../linkifyText";
 // https://developers.cloudflare.com/workers-ai/models/ for current models.
 const emailSummaryModel = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 
+// What `pnpm dev` shows instead of a real summary. Has a link so linkifyText
+// still has something to render.
+const localDevFakeEmailSummary =
+  "[local dev] Fake summary: Workers AI is production-only, so `pnpm dev` " +
+  "never calls it. See https://developers.cloudflare.com/workers-ai/models/";
+
 /**
  * Runs through the `AI` binding rather than the REST API, which drops the
  * account id and the `CLOUDFLARE_AI_KEY` secret from the project.
+ *
+ * The binding exists only in the production wrangler env. Development has none
+ * (see wrangler.jsonc), so local dev needs no Cloudflare login and returns a
+ * fixed fake summary. Anywhere else, a missing binding is a deploy mistake and
+ * throws.
  *
  * The binding still needs the same defensive check: a retired model does not
  * throw, it comes back without a `response` string.
  */
 async function runEmailSummaryModel(model: string, input: object) {
-  const { env } = getCloudflareContext();
+  if (process.env.NODE_ENV === "development") {
+    return localDevFakeEmailSummary;
+  }
 
-  const result = (await env.AI.run(model as never, input as never)) as {
+  const { env } = getCloudflareContext();
+  // `wrangler types` reads the development env, which has no AI binding.
+  const ai = (env as CloudflareEnv & { AI?: Ai }).AI;
+
+  if (ai === undefined) {
+    throw new Error(
+      "No Workers AI binding (`AI`) in this Worker. Only the production env in " +
+        "wrangler.jsonc has one; `pnpm preview` runs the development env, so " +
+        "it can't show summaries."
+    );
+  }
+
+  const result = (await ai.run(model as never, input as never)) as {
     response?: string;
   };
 
