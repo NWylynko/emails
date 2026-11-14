@@ -690,8 +690,20 @@ echo "http://localhost:8787/authenticate?token=$T"
 Worth walking: `/` (inbox list), `/inbox/<email>`, `/email/<id>`,
 `/email/<id>/html`, `/email/<id>/ai`, attachment download, settings dialog.
 
-**The AI binding bills real money even in local dev** — wrangler warns about this.
-Don't leave the AI tab in a refresh loop.
+**The AI tab shows a fake summary in local dev.** The `AI` binding exists only in
+the production env of `wrangler.jsonc`. In development, Workers AI would need a
+Cloudflare login on every `pnpm dev` (wrangler uploads a proxy Worker to reach
+it), and coding agents only have Infisical. So `runEmailSummaryModel` returns a
+fixed `[local dev]` summary when `NODE_ENV=development`. Anywhere else a missing
+binding throws: `pnpm preview` runs the development env and cannot show
+summaries. Real summaries can only be checked in production.
+`src/localDev/localDevStartsWithoutCloudflareLogin.test.ts` fails if a binding
+that needs Cloudflare comes back into the development env.
+
+**Every `infisical run` passes `--projectId`.** With a machine-identity token
+(`INFISICAL_TOKEN`, which is how coding agents and CI authenticate), the CLI
+ignores `.infisical.json` and fails with "Project ID is required when using
+machine identity". A personal `infisical login` works either way.
 
 ## Migration status
 
