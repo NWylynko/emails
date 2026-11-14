@@ -15,6 +15,7 @@ export type InboxSummary = {
   total: number;
   unread: number;
   latest: Date | null;
+  silent: boolean;
 };
 
 export async function listInboxesWithCounts(): Promise<InboxSummary[]> {
@@ -28,9 +29,14 @@ export async function listInboxesWithCounts(): Promise<InboxSummary[]> {
         .sum(driz.sql`CASE WHEN ${emails.viewed} = false THEN 1 ELSE 0 END`)
         .as("unread"),
       latest,
+      silent: inboxes.silent,
     })
     .from(emails)
-    .groupBy(emails.to)
+    // An inbox only gets an `inboxes` row once its settings are changed, so most
+    // have none — left join, and treat a missing row as not silent. `inbox` is
+    // unique, so the join never multiplies the counts.
+    .leftJoin(inboxes, driz.eq(inboxes.inbox, emails.to))
+    .groupBy(emails.to, inboxes.silent)
     .orderBy(driz.desc(latest));
 
   return rows.map((row) => ({
@@ -38,6 +44,7 @@ export async function listInboxesWithCounts(): Promise<InboxSummary[]> {
     total: Number(row.total),
     unread: Number(row.unread ?? 0),
     latest: row.latest ?? null,
+    silent: row.silent ?? false,
   }));
 }
 

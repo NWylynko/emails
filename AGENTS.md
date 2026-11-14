@@ -531,6 +531,22 @@ passed from server components as props rather than via `NEXT_PUBLIC_` prefixes,
 so they resolve at runtime. `PUSHER_SECRET` and `BEAMS_SECRET` are the actual
 secrets and never leave the Worker.
 
+## Dependency upgrades
+
+- **`@varlock/nextjs-integration` is held on 1.x** (package.json *and* the
+  `@next/env` override in `pnpm-workspace.yaml`, which must move together). 2.x
+  freezes the env into OpenNext / Workers Builds output encrypted, so it needs a
+  new `_VARLOCK_ENV_KEY` at build time (build fails without it) and in the
+  Worker's runtime secret store (every request 500s without it). Adopt it only
+  together with that key in Infisical and the Cloudflare secret sync.
+- **postgres.js 4.x**: Next's bundler picks its Node build (`net`/`tls` under
+  `nodejs_compat`), not the `workerd` export. Verified working inside workerd
+  through local Hyperdrive. v4 lets the server infer parameter types
+  (`infer: false`); drizzle passes timestamps as ISO strings, so this is safe
+  today, but a raw `sql` template given a `Date` needs an explicit cast.
+- The Rust CLI uses reqwest 0.13, whose `rustls` feature verifies against the OS
+  trust store (rustls-platform-verifier) rather than bundled webpki roots.
+
 ## Types
 
 `pnpm generate-types` runs `wrangler types --env=development` into
