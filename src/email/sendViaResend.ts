@@ -21,7 +21,7 @@ export async function sendViaResend(
         total +
         (typeof attachment.content === "string"
           ? attachment.content.length
-          : attachment.content?.length ?? 0),
+          : attachment.content?.byteLength ?? 0),
       0
     ) ?? 0;
 

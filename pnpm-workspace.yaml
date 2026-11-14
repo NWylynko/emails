@@ -13,31 +13,19 @@ minimumReleaseAge: 4320
 
 # varlock's Next.js integration works by replacing Next's own env loader.
 # Required by @varlock/nextjs-integration; overrides are read from here.
+#
+# Held on 1.x, here and in package.json. 2.x freezes the env into OpenNext /
+# Workers Builds output *encrypted*, so it needs a new _VARLOCK_ENV_KEY secret
+# at build time (or the build fails) AND in the Worker's runtime secret store
+# (or every request fails). Adopt 2.x only together with that key in Infisical
+# prod/dev and the Cloudflare secret sync. Bump both majors together.
 overrides:
-  "@next/env": "npm:@varlock/nextjs-integration"
+  "@next/env": "npm:@varlock/nextjs-integration@^1.2.5"
 
 minimumReleaseAgeExclude:
-  - lucide-react@1.31.0
-  # 16.3.3 is a security release — two critical unauthenticated RCEs (Windows
-  # hosts; Image Optimization via AVIF). Neither reaches this app, but waiting
-  # out the cooldown on an RCE fix is the wrong side of the trade. Exempted the
-  # day it shipped. The swc binaries are listed one by one because pnpm rejects
-  # a name pattern carrying a version (`@next/swc-*@16.3.3`), and an unpinned
-  # `@next/swc-*` would exempt every future release too.
-  - next@16.3.3
-  - '@next/swc-darwin-arm64@16.3.3'
-  - '@next/swc-darwin-x64@16.3.3'
-  - '@next/swc-linux-arm64-gnu@16.3.3'
-  - '@next/swc-linux-arm64-musl@16.3.3'
-  - '@next/swc-linux-x64-gnu@16.3.3'
-  - '@next/swc-linux-x64-musl@16.3.3'
-  - '@next/swc-win32-arm64-msvc@16.3.3'
-  - '@next/swc-win32-x64-msvc@16.3.3'
-  - miniflare@5.20260804.0-alpha
-  - react-hook-form@7.85.0
+  # Pinned versions only: each entry exempts exactly one release, so remove it
+  # once the lockfile has moved past that version.
   - sonner@2.0.8
-  - varlock@1.16.1
-  - wrangler@4.120.1
 
 allowBuilds:
   '@infisical/cli': true
