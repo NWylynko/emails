@@ -44,15 +44,41 @@ Cloudflare Workers Builds settings:
 | field | value |
 |-------|-------|
 | Build command | `pnpm ci:build` |
-| Deploy command | `npx wrangler deploy --env production` |
+| Deploy command | `pnpm ci:deploy` |
+| Non-production branch builds | **off** |
 
 `--env production` is not optional. Without it CI publishes `emails-dev`, which
 is bound to the clone, and the `emails` Worker never receives the build. The two
 wrangler configs are named differently precisely so that mistake is visible
 rather than silently pointing the live Worker at the clone.
 
-`pnpm ci:build` authenticates a machine identity with `INFISICAL_CLIENT_ID` /
-`INFISICAL_CLIENT_SECRET` (set as build secrets in the Cloudflare dashboard),
+**`ci:deploy` deliberately bypasses `opennextjs-cloudflare deploy`.** Plain
+`wrangler deploy` detects an OpenNext project (`next.config.*` +
+`open-next.config.*` + the package installed) and hands off to OpenNext's deploy
+command, which since OpenNext 1.20 starts `getPlatformProxy()` first just to
+read string vars. The `AI` binding can never be simulated locally, so that
+proxy always opens a remote session — uploading a preview Worker to
+`emails.nick-dev.workers.dev`, which is behind Cloudflare Access. In CI that
+fails with "behind Cloudflare Access, but no Access Service Token credentials
+were found", after the build and migrations have already succeeded.
+`OPEN_NEXT_DEPLOY=true` is the flag wrangler and OpenNext use between
+themselves to stop the handoff recursing, so setting it makes `wrangler deploy`
+deploy directly. Nothing is lost: with an empty `defineCloudflareConfig()` the
+wrapper populates no incremental or tag cache and sets up no skew protection.
+**If either is ever enabled in `open-next.config.ts`, the wrapper becomes
+necessary** — switch back and give the build an Access service token
+(`CLOUDFLARE_ACCESS_CLIENT_ID` / `CLOUDFLARE_ACCESS_CLIENT_SECRET`) instead.
+
+**Branch builds are off on purpose.** The non-production build defaults to
+`pnpm run build`, which has no Infisical login and fails, and the fix is not to
+point it at `pnpm ci:build`: that runs `ci:migrate` against **production** and
+uploads a version of the production Worker, so every pushed branch would
+migrate the live database before review.
+
+`pnpm ci:build` authenticates a machine identity with
+`INFISICAL_UNIVERSAL_AUTH_CLIENT_ID` / `INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET`
+(set as build variables in the Cloudflare dashboard — the names the Infisical
+CLI reads),
 exports the resulting `INFISICAL_TOKEN`, and runs
 `opennextjs-cloudflare build --env=production`. Pushing to `main` triggers a
 Workers Builds build + deploy (verified live: a push lands as a new deployed
@@ -722,22 +748,10 @@ Done:
 
 Not done:
 
-- **Production has not been migrated yet.** `MIGRATIONS_DATABASE_URL` is set in
-  Infisical prod (verified 2026-08-17: 12 values inject, unpooled
-  `ep-purple-bread-a782nann` host), but nothing has been pushed, so prod still
-  has no `drizzle` schema and no `emails.search` column. The next push to `main`
-  applies `0000` and `0001` via `ci:migrate` before the build.
-
-  Expect a brief write freeze when it lands. Adding a STORED generated column
-  rewrites the table under an ACCESS EXCLUSIVE lock, which blocks reads *and*
-  inbound mail INSERTs. Measured read-only against production: computing the
-  index expression for all 3,707 rows takes ~5.6s. Prefer a quiet moment —
-  Email Routing retries a delivery it could not complete, and AGENTS.md's
-  duplicate-row warning applies.
-
-  Also measured on production, so no surprises: 0 emails exceed the 200k-char
-  truncation, 0 have `r2:` pointer bodies, and the largest resulting tsvector is
-  88,531 bytes against the 1MB cap.
+- **Production is migrated** (2026-11-14): the first `main` build after the
+  dependency update ran `ci:migrate`, and drizzle-kit reported migrations
+  applied. That build's deploy step then failed on the Access issue above, which
+  is what `ci:deploy` fixes.
 - The Rust CLI has no `search` subcommand for `GET /v1/search`.
 
 - The old `email-service` Worker and the `email-client`/`email-cli` repos still
