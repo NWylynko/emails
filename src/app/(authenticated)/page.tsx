@@ -8,7 +8,7 @@ import { listInboxesWithCounts } from "@/inbox/inboxQueries";
 import { EmailSearchBox } from "@/search/EmailSearchBox";
 import { SignOutButton } from "@clerk/nextjs";
 import { DialogTrigger } from "@radix-ui/react-dialog";
-import { CogIcon } from "lucide-react";
+import { BellOffIcon, CogIcon } from "lucide-react";
 import Link from "next/link";
 import { connection } from "next/server";
 import { ENV } from "varlock/env";
@@ -66,6 +66,12 @@ export default async function Home(props: PageProps<"/">) {
                   <span className="text-sm text-gray-500">
                     {inbox.total}
                   </span>
+                )}
+                {inbox.silent && (
+                  <BellOffIcon
+                    className="size-4 text-gray-400"
+                    aria-label="Silent inbox"
+                  />
                 )}
               </div>
             </div>
