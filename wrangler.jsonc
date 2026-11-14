@@ -32,10 +32,12 @@
           "bucket_name": "email-attachments"
         }
       ],
-      // remote:true acknowledges Workers AI always calls the real service even
-      // from local emulation, silencing the usage-charge warning wrangler
-      // prints whenever it instantiates the binding.
-      "ai": { "binding": "AI", "remote": true },
+      // No "ai" binding in development, on purpose. Workers AI can't run
+      // locally: wrangler reaches it by uploading a proxy Worker, which makes
+      // every `pnpm dev` need a Cloudflare login. Local dev serves a fake
+      // summary instead (src/app/(authenticated)/email/[id]/ai/page.tsx), so dev
+      // needs only an Infisical login. Guarded by
+      // src/localDev/localDevStartsWithoutCloudflareLogin.test.ts.
     },
     "production": {
       "name": "emails",
