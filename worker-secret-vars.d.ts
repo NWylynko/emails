@@ -22,5 +22,4 @@ interface CloudflareEnv {
   PUSHER_KEY: string;
   PUSHER_SECRET: string;
   RESEND_KEY: string;
-  TECHULUS_API_KEY: string;
 }

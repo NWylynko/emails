@@ -95,7 +95,7 @@ Infisical feeds two different places, and dropping either breaks something:
 
 | | feeds | symptom if missing |
 |---|---|---|
-| `infisical run` around the build | varlock validation, and inlining public values into the artifact | build fails: "Value is required but is currently empty" (all 11 items) |
+| `infisical run` around the build | varlock validation, and inlining public values into the artifact | build fails: "Value is required but is currently empty" (all 10 items) |
 | Infisical → Cloudflare **secret sync** | the deployed Worker's runtime `env` | build and deploy succeed, then every request fails |
 
 Nine values are read as `env.API_TOKEN`, `env.PUSHER_*` and so on — Cloudflare
@@ -103,7 +103,7 @@ binding lookups that only the Worker's secret store populates. `CLERK_SECRET_KEY
 is read by the Clerk SDK from `process.env`, which OpenNext fills from the same
 store. **Build-time injection does not carry into the deployed Worker.**
 
-The Infisical -> Cloudflare secret sync IS live (all 11 values from
+The Infisical -> Cloudflare secret sync IS live (all 10 values from
 `.env.schema` are in the Worker's secret store). Because the sync owns the
 store, `wrangler secret put` must never be used — the next sync silently
 overwrites it.
@@ -626,7 +626,7 @@ deployed.
 Two things to get right when testing:
 
 - **Force the target inbox `silent: true` first**, or the run pages a real phone
-  through Pusher Beams and Techulus.
+  through Pusher Beams.
 - Resend is constructed lazily, inside the forward-on branch only. Its
   constructor throws on a missing key, so building it eagerly makes every
   ordinary delivery depend on a credential it never uses — and since Email
