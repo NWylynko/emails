@@ -705,6 +705,15 @@ that needs Cloudflare comes back into the development env.
 ignores `.infisical.json` and fails with "Project ID is required when using
 machine identity". A personal `infisical login` works either way.
 
+**Dev and prod secrets live in different Infisical projects.** Every `--env=dev`
+script uses project `db9d19ba-bf66-41b9-995b-d297bdb9f182`. That's the one the
+coding-workspace token can read. `--env=prod` uses
+`39a9c656-043d-41b0-bc73-a288c8b22baa`, which that token can't read.
+`build` takes its project from `BUILD_INFISICAL_PROJECT_ID`, defaulting to prod.
+`preview:build` sets it alongside `BUILD_INFISICAL_ENV=dev`.
+`.infisical.json` still names the prod project. It matters only for a bare
+`infisical` command with no `--projectId`.
+
 ## Migration status
 
 Done:
