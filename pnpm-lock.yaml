@@ -18,8 +18,8 @@ importers:
         specifier: ^7.0.5
         version: 7.0.5(react-hook-form@7.91.0(@types/react@19.3.0)(react@19.3.1))(zod@4.6.7)
       '@pusher/push-notifications-web':
-        specifier: ^1.1.0
-        version: 1.1.0
+        specifier: ^2.1.0
+        version: 2.1.0
       '@radix-ui/react-dialog':
         specifier: ^1.3.1
         version: 1.3.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -1356,8 +1356,8 @@ packages:
   '@poppinss/exception@1.2.3':
     resolution: {integrity: sha512-dCED+QRChTVatE9ibtoaxc+WkdzOSjYTKi/+uacHWIsfodVfpsueo3+DKpgU5Px8qXjgmXkSvhXvSCz3fnP9lw==}
 
-  '@pusher/push-notifications-web@1.1.0':
-    resolution: {integrity: sha512-qR9RZNpH9E54GEpn9uqag9VbLG3kk13DPtf0v4ScsbIZhLFrc1vVWoylzh9zPKiJx3LLwnSxZQA/DkF13OBYXw==}
+  '@pusher/push-notifications-web@2.1.0':
+    resolution: {integrity: sha512-ky2HHwPG6drQyMXYeNEScsrk1GI3AyE4sjv2dwbVHI/aAUgsGzAuo4MVfbAXQ5Nx7tj7MFbZ1+PPh61x4EuOSA==}
 
   '@radix-ui/number@1.1.3':
     resolution: {integrity: sha512-Road2bidD0uu/1BGDOWNdPI06g0lIRy6IF9GZcIrDK2KGItfor8IQwQa+yM2ERgHM1MmHxaxpTzk0/Jp42lNfA==}
@@ -5024,7 +5024,7 @@ snapshots:
 
   '@poppinss/exception@1.2.3': {}
 
-  '@pusher/push-notifications-web@1.1.0': {}
+  '@pusher/push-notifications-web@2.1.0': {}
 
   '@radix-ui/number@1.1.3': {}
 

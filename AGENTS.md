@@ -585,6 +585,22 @@ gone). It declares `mainModule: typeof import("./worker")`, which drags
 Note the runtime globals override the DOM lib, so `Response.json()` returns
 `unknown` rather than `any` in client components. Type the result.
 
+## Push notifications (Pusher Beams web)
+
+`src/components/PushNotifications.tsx` registers the device; `public/service-worker.js`
+imports Beams' CDN worker; `src/notification/notifyAboutEmail.ts` publishes.
+
+- **`@pusher/push-notifications-web` must stay >= 2.1.** 1.x had a UA allowlist
+  (Chrome/Firefox/Edge/Opera): on Safari/iOS `start()` returned silently without
+  ever prompting, then `addDeviceInterest` threw "SDK not registered with Beams".
+  That is why the iPhone never received pushes while the Mac (Chrome) did.
+- 2.x `getDeviceInterests()` returns `{ interests }` — its `.d.ts` still says `string[]`.
+- iOS only exposes `PushManager` to a Home Screen web app opened standalone; in a
+  Safari tab the component shows an explanation instead of a button.
+- `Notification.requestPermission()` is the first await in the click handler on
+  purpose: iOS only prompts inside the tap's user gesture, and the SDK otherwise
+  asks inside `pushManager.subscribe()` after network round-trips.
+
 ## The mail handler
 
 **Secrets in the email vertical come from the `env` parameter, never
