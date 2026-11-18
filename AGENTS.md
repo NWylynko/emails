@@ -612,6 +612,19 @@ prior fetch has initialized it and the same code works, which makes the bug
 look intermittent. This took down mail for ~15 minutes during the 2026-08-11
 cutover; `worker-secret-vars.d.ts` documents the rule.
 
+**Forwarding is authenticated, not address-matched.** Mail is forwarded through
+Resend only when `decideForward()` (`src/email/forwardAuthorization.ts`) passes:
+`FORWARD_SENDER` is set, the envelope sender and `From:` both equal it, and the
+topmost `Authentication-Results` header (authserv-id `mx.cloudflare.net`) shows
+`dmarc=pass` for its domain plus an aligned SPF or DKIM pass. Unset or empty
+`FORWARD_SENDER` means nothing is ever forwarded. Anything that fails is stored
+and notified as ordinary mail, and a `receiveEmail forward refused` line is
+logged. The header is read from mailparser's ordered `headerLines`, not
+`message.headers`, because `Headers.get()` merges a forged copy into the real one.
+The pipeline lives in `processInboundEmail()` with its side effects injected, so
+`processInboundEmail.test.ts` covers this without a database. Never put the real
+sender address in the repo; it lives in Infisical only.
+
 The cheapest live end-to-end test: mute an inbox
 (`PUT /v1/inboxes/<to> {"silent": true}` — it upserts), send real mail to it
 via the Resend API, and `wrangler tail emails` to watch `receiveEmail` log and

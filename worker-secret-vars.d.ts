@@ -16,6 +16,8 @@ interface CloudflareEnv {
   BEAMS_INSTANCE_ID: string;
   BEAMS_SECRET: string;
   CLERK_SECRET_KEY: string;
+  /** Optional. Unset or empty disables forwarding. See .env.schema. */
+  FORWARD_SENDER?: string;
   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: string;
   PUSHER_APP_ID: string;
   PUSHER_CLUSTER: string;
