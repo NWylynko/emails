@@ -1,19 +1,11 @@
 # emails-cli
 
-Rust CLI for AI agents to **receive** mail on `*@wylynko.me` via the [email-service](https://github.com/NWylynko/email-service) HTTP API.
+Rust CLI for AI agents to **receive** mail on `*@example.com` via the `/v1` HTTP API of the emails Worker (this repo; the old standalone `email-service` repo is archived).
 
 ## Prerequisites
 
-1. Deploy email-service with the `/v1` API (see that repo).
-2. Set a shared secret on the Worker:
-
-```bash
-cd ../email-service
-npx wrangler secret put API_TOKEN
-# paste a long random token
-npx wrangler deploy
-```
-
+1. Deploy the emails Worker (see the root `AGENTS.md`).
+2. Set `API_TOKEN` in Infisical so the secret sync delivers it to the Worker.
 3. Note the Worker URL (your custom domain or workers.dev route).
 
 ## Install
@@ -34,7 +26,7 @@ Or write `~/.config/emails-cli/config.toml`:
 ```toml
 api_url = "https://<your-emails-deployment>"
 api_token = "…"
-domain = "wylynko.me"
+domain = "example.com"
 ```
 
 ## Usage
@@ -42,10 +34,10 @@ domain = "wylynko.me"
 ```bash
 emails address new
 emails inboxes --human
-emails list agent-…@wylynko.me
-emails wait agent-…@wylynko.me --timeout 120 --subject verify
+emails list agent-…@example.com
+emails wait agent-…@example.com --timeout 120 --subject verify
 emails get 123
-emails inbox mute agent-…@wylynko.me
+emails inbox mute agent-…@example.com
 emails attachment list 123
 emails attachment get 456 -o file.pdf
 ```
@@ -58,10 +50,10 @@ See [skills/emails/SKILL.md](skills/emails/SKILL.md). Copy or symlink into your 
 
 ```bash
 mkdir -p ~/.cursor/skills
-ln -sfn /home/nick/emails-cli/skills/emails ~/.cursor/skills/emails
+ln -sfn /path/to/emails/cli/skills/emails ~/.cursor/skills/emails
 ```
 
-## API surface (email-service)
+## API surface
 
 All routes require `Authorization: Bearer <API_TOKEN>`.
 
