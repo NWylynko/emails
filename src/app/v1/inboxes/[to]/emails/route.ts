@@ -21,8 +21,8 @@ function parseBool(value: string | null, fallback: boolean): boolean {
 
 export const GET = withApiToken(
   async (request: Request, context: { params: Promise<{ to: string }> }) => {
-    // Next has already percent-decoded the segment, so `nick%40wylynko.me`
-    // arrives as `nick@wylynko.me`.
+    // Next has already percent-decoded the segment, so `user%40example.com`
+    // arrives as `user@example.com`.
     const { to } = await context.params;
     const params = new URL(request.url).searchParams;
 

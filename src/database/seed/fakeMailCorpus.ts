@@ -54,18 +54,18 @@ function createSeededRandom(seed: number): () => number {
 }
 
 const INBOXES = [
-  "nick@wylynko.me",
-  "github@wylynko.me",
-  "shopping@wylynko.me",
-  "banking@wylynko.me",
-  "newsletters@wylynko.me",
-  "signup-test@wylynko.me",
-  "cloud@wylynko.me",
-  "travel@wylynko.me",
-  "social@wylynko.me",
-  "receipts@wylynko.me",
-  "support@wylynko.me",
-  "throwaway@wylynko.me",
+  "primary@example.com",
+  "github@example.com",
+  "shopping@example.com",
+  "banking@example.com",
+  "newsletters@example.com",
+  "signup-test@example.com",
+  "cloud@example.com",
+  "travel@example.com",
+  "social@example.com",
+  "receipts@example.com",
+  "support@example.com",
+  "throwaway@example.com",
 ];
 
 /**
@@ -186,7 +186,7 @@ export const SEARCH_FIXTURES = {
   /** Plain single-word needle. */
   uniqueToken: {
     token: "zarquon",
-    to: "nick@wylynko.me",
+    to: "primary@example.com",
     from: "needle@fixtures.test",
     subject: "The zarquon report",
     body: "This is the only email in the corpus containing the word zarquon. Searching for it must return exactly this message.",
@@ -194,14 +194,14 @@ export const SEARCH_FIXTURES = {
   /** Proves ranking puts a subject hit above a body-only hit for the same term. */
   subjectWeighted: {
     token: "brindlewick",
-    to: "nick@wylynko.me",
+    to: "primary@example.com",
     from: "ranking@fixtures.test",
     subject: "brindlewick in the subject line",
     body: "The body of this message does not repeat the term at all.",
   },
   bodyWeighted: {
     token: "brindlewick",
-    to: "nick@wylynko.me",
+    to: "primary@example.com",
     from: "ranking@fixtures.test",
     subject: "A subject with no special term",
     body: "This message mentions brindlewick only down here in the body, so it must rank below the one carrying it in the subject.",
@@ -209,20 +209,20 @@ export const SEARCH_FIXTURES = {
   /** Stemming: indexed as "cancel", so a search for "cancel" must find it. */
   stemming: {
     token: "cancellations",
-    to: "shopping@wylynko.me",
+    to: "shopping@example.com",
     from: "stemming@fixtures.test",
     subject: "Policy on cancellations",
     body: "Repeated cancellations of the same order will be reviewed by our team.",
   },
   /** Phrase search must distinguish this from the decoy below. */
   phrase: {
-    to: "banking@wylynko.me",
+    to: "banking@example.com",
     from: "phrase@fixtures.test",
     subject: "Your account balance is low",
     body: "The phrase account balance appears here in this exact order.",
   },
   phraseDecoy: {
-    to: "banking@wylynko.me",
+    to: "banking@example.com",
     from: "phrase@fixtures.test",
     subject: "Balance of the account explained",
     body: "Here the words appear but the balance of your account is written the other way around.",
@@ -230,14 +230,14 @@ export const SEARCH_FIXTURES = {
   /** Unicode — must survive the round trip and stay searchable. */
   unicode: {
     token: "Grüße",
-    to: "social@wylynko.me",
+    to: "social@example.com",
     from: "unicode@fixtures.test",
     subject: "Grüße aus München 🎉",
     body: "Herzliche Grüße und einen schönen Tag. Emoji: 🎉🚀 — these must round-trip intact.",
   },
   /** The R2 pointer case: body is a pointer, not text. Content is NOT searchable. */
   oversizedPointer: {
-    to: "nick@wylynko.me",
+    to: "primary@example.com",
     from: "oversized@fixtures.test",
     subject: "Email whose body was stashed in R2",
     body: "r2:oversized-email-part/seed-oversized-body-fixture",
@@ -345,7 +345,7 @@ export function generateFakeMailCorpus(count: number, seed = 20260817): FakeMail
     fixture(SEARCH_FIXTURES.oversizedPointer),
     {
       from: "overflow@fixtures.test",
-      to: "nick@wylynko.me",
+      to: "primary@example.com",
       subject: "Body large enough to overflow a tsvector",
       body: buildTsvectorOverflowBody(),
       html: null,
@@ -360,7 +360,7 @@ export function generateFakeMailCorpus(count: number, seed = 20260817): FakeMail
   const inboxes: FakeInbox[] = INBOXES.map((inbox, i) => ({
     inbox,
     silent: i % 5 === 0,
-    receiver: inbox === "nick@wylynko.me" ? "noreply@github.com" : null,
+    receiver: inbox === "primary@example.com" ? "noreply@github.com" : null,
   }));
 
   return { inboxes, emails };

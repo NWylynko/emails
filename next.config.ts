@@ -28,7 +28,16 @@ if (process.env.NODE_ENV === "development") {
 const withVarlock = varlockNextConfigPlugin();
 
 const nextConfig = {
-  allowedDevOrigins: ["127.0.0.1", "localhost", "remote-box", "homelab"],
+  // Extra hostnames you browse the dev server from (e.g. a remote dev box),
+  // comma-separated in ALLOWED_DEV_ORIGINS.
+  allowedDevOrigins: [
+    "127.0.0.1",
+    "localhost",
+    ...(process.env.ALLOWED_DEV_ORIGINS ?? "")
+      .split(",")
+      .map((host) => host.trim())
+      .filter(Boolean),
+  ],
 } satisfies NextConfig;
 
 export default withVarlock(nextConfig);

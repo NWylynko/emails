@@ -2,7 +2,7 @@
 name = "emails"
 version = "0.1.0"
 edition = "2021"
-description = "CLI for receiving *@wylynko.me mail via email-service"
+description = "CLI for receiving mail on a catch-all domain"
 license = "MIT"
 readme = "README.md"
 
