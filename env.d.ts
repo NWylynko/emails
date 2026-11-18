@@ -38,7 +38,7 @@ export type CoercedEnvSchema = {
   NEXT_PUBLIC_CLERK_SIGN_IN_URL: string;
   
   /**
-   * **ALLOWED_USER_IDS**  
+   * **ALLOWED_USER_IDS** 🔐 _sensitive_  
    * Comma-separated Clerk user IDs allowed past the sign-in gate (see  
    * src/middleware.ts). Empty or unset admits no one — it fails closed. Set in  
    * Infisical prod and dev.  
@@ -53,26 +53,28 @@ export type CoercedEnvSchema = {
    * ![icon](data:image/svg+xml;utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2220%22%20height%3D%2220%22%20viewBox%3D%220%200%2032%2032%22%3E%3Cpath%20fill%3D%22%23808080%22%20d%3D%22M29%2022h-5a2.003%202.003%200%200%201-2-2v-6a2%202%200%200%201%202-2h5v2h-5v6h5ZM18%2012h-4V8h-2v14h6a2.003%202.003%200%200%200%202-2v-6a2%202%200%200%200-2-2m-4%208v-6h4v6Zm-6-8H3v2h5v2H4a2%202%200%200%200-2%202v2a2%202%200%200%200%202%202h6v-8a2%202%200%200%200-2-2m0%208H4v-2h4Z%22%2F%3E%3C%2Fsvg%3E)   
    */
   API_TOKEN: string;
-
+  
   /**
-   * **SITE_URL**
-   * Public origin of the deployed website, no trailing slash, e.g.
-   * https://emails.example.com. Used for the deep link in push notifications and
-   * the link in forward-failure replies. Read from the email() handler's `env`,
-   * so it is also declared in worker-secret-vars.d.ts. Must match the Custom
-   * Domain in wrangler.jsonc. Set in Infisical dev and prod.
+   * **SITE_URL** 🔐 _sensitive_  
+   * Public origin of the deployed website, no trailing slash, e.g.  
+   * https://emails.example.com. Used for the deep link in push notifications and  
+   * the link in forward-failure replies. Read from the email() handler's `env`,  
+   * so it is also declared in worker-secret-vars.d.ts. Must match the Custom  
+   * Domain in wrangler.jsonc. Set in Infisical dev and prod.  
+   * ![icon](data:image/svg+xml;utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2220%22%20height%3D%2220%22%20viewBox%3D%220%200%2032%2032%22%3E%3Cpath%20fill%3D%22%23808080%22%20d%3D%22M29%2022h-5a2.003%202.003%200%200%201-2-2v-6a2%202%200%200%201%202-2h5v2h-5v6h5ZM18%2012h-4V8h-2v14h6a2.003%202.003%200%200%200%202-2v-6a2%202%200%200%200-2-2m-4%208v-6h4v6Zm-6-8H3v2h5v2H4a2%202%200%200%200-2%202v2a2%202%200%200%200%202%202h6v-8a2%202%200%200%200-2-2m0%208H4v-2h4Z%22%2F%3E%3C%2Fsvg%3E)   
    */
   SITE_URL: string;
-
+  
   /**
-   * **MAIL_FROM**
-   * From address for the mail handler's own replies (inbox not found, no receiver
-   * set, no text), e.g. noreply@example.com. Must be an address Resend may send
-   * from. Read from the email() handler's `env`; also declared in
-   * worker-secret-vars.d.ts. Set in Infisical dev and prod.
+   * **MAIL_FROM** 🔐 _sensitive_  
+   * From address for the mail handler's own replies (inbox not found, no receiver  
+   * set, no text), e.g. noreply@example.com. Must be an address Resend may send  
+   * from. Read from the email() handler's `env`; also declared in  
+   * worker-secret-vars.d.ts. Set in Infisical dev and prod.  
+   * ![icon](data:image/svg+xml;utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2220%22%20height%3D%2220%22%20viewBox%3D%220%200%2032%2032%22%3E%3Cpath%20fill%3D%22%23808080%22%20d%3D%22M29%2022h-5a2.003%202.003%200%200%201-2-2v-6a2%202%200%200%201%202-2h5v2h-5v6h5ZM18%2012h-4V8h-2v14h6a2.003%202.003%200%200%200%202-2v-6a2%202%200%200%200-2-2m-4%208v-6h4v6Zm-6-8H3v2h5v2H4a2%202%200%200%200-2%202v2a2%202%200%200%200%202%202h6v-8a2%202%200%200%200-2-2m0%208H4v-2h4Z%22%2F%3E%3C%2Fsvg%3E)   
    */
   MAIL_FROM: string;
-
+  
   /**
    * **FORWARD_SENDER** 🔐 _sensitive_  
    * The one address allowed to use the forward-on path: mail from it to an inbox  
@@ -198,11 +200,11 @@ export type CoercedEnvSchema = {
   
 };
 
-type _CoercedEnvSchema_ebbe7096 = CoercedEnvSchema;
+type _CoercedEnvSchema_c9082a60 = CoercedEnvSchema;
 
 declare module 'varlock/env' {
-  export interface TypedEnvSchema extends Readonly<_CoercedEnvSchema_ebbe7096> {}
-  export interface PublicTypedEnvSchema extends Readonly<Pick<_CoercedEnvSchema_ebbe7096, 'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY' | 'NEXT_PUBLIC_CLERK_SIGN_IN_URL' | 'PUSHER_KEY' | 'PUSHER_CLUSTER' | 'BEAMS_INSTANCE_ID' | 'NEXTJS_ENV'>> {}
+  export interface TypedEnvSchema extends Readonly<_CoercedEnvSchema_c9082a60> {}
+  export interface PublicTypedEnvSchema extends Readonly<Pick<_CoercedEnvSchema_c9082a60, 'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY' | 'NEXT_PUBLIC_CLERK_SIGN_IN_URL' | 'PUSHER_KEY' | 'PUSHER_CLUSTER' | 'BEAMS_INSTANCE_ID' | 'NEXTJS_ENV'>> {}
 }
 
 
@@ -212,17 +214,17 @@ export type EnvSchemaAsStrings = {
       : (NonNullable<CoercedEnvSchema[Property]> extends boolean ? ('true' | 'false') : string)
 };
 
-type _EnvSchemaAsStrings_ebbe7096 = EnvSchemaAsStrings;
+type _EnvSchemaAsStrings_c9082a60 = EnvSchemaAsStrings;
 declare global {
 
   // add types for global import.meta.env
-  interface ImportMetaEnv extends _EnvSchemaAsStrings_ebbe7096 {}
+  interface ImportMetaEnv extends _EnvSchemaAsStrings_c9082a60 {}
   interface ImportMeta {
     readonly env: ImportMetaEnv;
   }
 
   // add types for global process.env
   namespace NodeJS {
-    interface ProcessEnv extends _EnvSchemaAsStrings_ebbe7096 {}
+    interface ProcessEnv extends _EnvSchemaAsStrings_c9082a60 {}
   }
 }
