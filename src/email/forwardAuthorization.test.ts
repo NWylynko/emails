@@ -8,6 +8,8 @@ import {
 } from "./forwardAuthorization.ts";
 
 const SENDER = "sender@example.com";
+// Test value only. The real FORWARD_SECRET lives in Infisical.
+const SECRET = "test-forward-secret-0123456789abcdef";
 
 const PASSING_HEADER =
   "mx.cloudflare.net; dkim=pass header.d=example.com header.s=s1 header.b=abc; " +
@@ -20,12 +22,98 @@ function input(
 ): ForwardAuthorizationInput {
   return {
     forwardSender: SENDER,
+    forwardSecret: SECRET,
+    presentedSecrets: [SECRET],
     envelopeFrom: SENDER,
     headerFromAddresses: [SENDER],
     authenticationResults: [PASSING_HEADER],
     ...overrides,
   };
 }
+
+/** A header a spoofer can write: Cloudflare's authserv-id and every pass. */
+const FORGED_CLOUDFLARE_PASS =
+  "mx.cloudflare.net; dkim=pass header.d=example.com; " +
+  "spf=pass smtp.mailfrom=sender@example.com; dmarc=pass header.from=example.com";
+
+describe("decideForward: the shared secret is required", () => {
+  test("a forged mx.cloudflare.net dmarc=pass header alone does not forward when the secret is absent", () => {
+    // The review's reproduction: spoofed address plus a forged
+    // Authentication-Results and nothing else.
+    assert.deepEqual(
+      decideForward(
+        input({
+          presentedSecrets: [],
+          authenticationResults: [FORGED_CLOUDFLARE_PASS],
+        })
+      ),
+      { forward: false, reason: "forward-secret-mismatch" }
+    );
+  });
+
+  test("a forged mx.cloudflare.net dmarc=pass header does not forward with a wrong secret", () => {
+    for (const presented of [
+      "wrong-secret-0123456789abcdef0123456789",
+      SECRET.slice(0, -1),
+      SECRET + "x",
+      SECRET.toUpperCase(),
+      "",
+    ]) {
+      assert.deepEqual(
+        decideForward(
+          input({
+            presentedSecrets: [presented],
+            authenticationResults: [FORGED_CLOUDFLARE_PASS],
+          })
+        ),
+        { forward: false, reason: "forward-secret-mismatch" },
+        `presented=${JSON.stringify(presented)}`
+      );
+    }
+  });
+
+  test("refuses more than one X-Forward-Secret header, even if one is right", () => {
+    for (const presentedSecrets of [
+      ["wrong", SECRET],
+      [SECRET, "wrong"],
+      [SECRET, SECRET],
+    ]) {
+      assert.equal(
+        decideForward(input({ presentedSecrets })).reason,
+        "forward-secret-mismatch"
+      );
+    }
+  });
+
+  test("never forwards when FORWARD_SECRET is unset, empty or too short, even if the message presents that value", () => {
+    for (const forwardSecret of [undefined, "", "   ", "short", "x".repeat(31)]) {
+      assert.deepEqual(
+        decideForward(
+          input({
+            forwardSecret,
+            presentedSecrets: [forwardSecret ?? ""],
+          })
+        ),
+        { forward: false, reason: "forward-secret-not-configured" },
+        `forwardSecret=${JSON.stringify(forwardSecret)}`
+      );
+    }
+  });
+
+  test("the correct secret from the configured sender forwards", () => {
+    assert.deepEqual(decideForward(input()), {
+      forward: true,
+      reason: "authenticated",
+    });
+  });
+
+  test("the correct secret does not help a different sender", () => {
+    assert.equal(
+      decideForward(input({ envelopeFrom: "attacker@evil.example" })).reason,
+      "sender-mismatch"
+    );
+  });
+});
 
 describe("decideForward", () => {
   test("forwards a message that passes DMARC with aligned SPF and DKIM", () => {
