@@ -1,5 +1,5 @@
 /**
- * Inbound Email Routing handler for `*@wylynko.me`.
+ * Inbound Email Routing handler for the catch-all domain.
  *
  * Parse the message, store it, upload attachments to R2, ping the website, then
  * either forward it on or just notify. Forwarding happens only when the message
@@ -35,6 +35,8 @@ export async function receiveEmail(
 
   await processInboundEmail(message, email, {
     forwardSender: env.FORWARD_SENDER,
+    systemSender: env.MAIL_FROM,
+    siteUrl: env.SITE_URL,
 
     async storeEmail() {
       // An inlined photo can push these past the varchar(1_000_000) columns

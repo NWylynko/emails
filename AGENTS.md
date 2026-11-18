@@ -114,6 +114,20 @@ together. A failed `email()` handler is the quiet one of the three — senders
 retry, rows duplicate, and nothing looks wrong from a browser. Tail the Worker
 after deploying and watch a delivery land.
 
+## Deployment identity — no real domain is committed
+
+The repo names no real domain. Three values carry it:
+
+- `SITE_URL` and `MAIL_FROM` (`.env.schema`, Infisical dev + prod, synced to the
+  Worker store) — the website origin used in notification links and error-reply
+  mail, and the From address for the handler's own replies. Both are required, so
+  a build without them fails rather than deploying links to `undefined`.
+- The `env.production.routes` Custom Domain in `wrangler.jsonc` is the
+  placeholder `emails.example.com`. wrangler config cannot read env vars, so
+  **set it to the real hostname before deploying**; a deploy with the placeholder
+  will fail to attach the domain rather than silently serve the wrong site.
+- The CLI reads its domain from `EMAILS_DOMAIN` or `domain` in its config file.
+
 ## Databases — read this before running anything
 
 Two Neon databases, and they are **not** the same:
@@ -125,7 +139,7 @@ Two Neon databases, and they are **not** the same:
 
 `wrangler.jsonc` has no top-level bindings: `env.development` (`emails-dev`
 Worker, dev Hyperdrive) and `env.production` (`emails` Worker, prod Hyperdrive,
-`emails.wylynko.me` custom domain) each carry their own. Verified safety
+custom domain) each carry their own. Verified safety
 properties:
 
 - **`wrangler dev` cannot reach production.** Miniflare refuses to use a remote
