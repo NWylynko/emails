@@ -698,7 +698,7 @@ To get a signed-in browser, mint a Clerk ticket (single-use):
 CLERK_SECRET_KEY=$(infisical secrets get CLERK_SECRET_KEY --env=dev --plain)
 T=$(curl -s -X POST https://api.clerk.com/v1/sign_in_tokens \
   -H "Authorization: Bearer $CLERK_SECRET_KEY" -H "Content-Type: application/json" \
-  -d '{"user_id":"user_2t6gJSoy2au2IcsGdNGFt32ZyQL","expires_in_seconds":1800}' \
+  -d '{"user_id":"<your-clerk-user-id>","expires_in_seconds":1800}' \
   | python3 -c "import json,sys; print(json.load(sys.stdin)['token'])")
 echo "http://localhost:8787/authenticate?token=$T"
 ```
