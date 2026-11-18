@@ -52,9 +52,11 @@ export type CoercedEnvSchema = {
    * e.g. sender@example.com. Set in Infisical dev and prod; never commit the real  
    * value.  
    *   
-   * Matching the address is not enough: the message must also carry  
-   * FORWARD_SECRET (below). See src/email/forwardAuthorization.ts. Mail that fails  
-   * is stored as ordinary inbound mail and not forwarded.  
+   * Matching the address is not enough: Cloudflare Email Routing's own  
+   * Authentication-Results header (from the Worker's message.headers, not the raw  
+   * message) must also show dmarc=pass for this address's domain. See  
+   * src/email/forwardAuthorization.ts. Mail that fails is stored as ordinary  
+   * inbound mail and not forwarded.  
    *   
    * Optional on purpose: unset or empty disables forwarding entirely, and does  
    * not affect ordinary inbound mail. Read from the email() handler's `env`, so it  
@@ -64,24 +66,9 @@ export type CoercedEnvSchema = {
   FORWARD_SENDER?: string;
   
   /**
-   * **FORWARD_SECRET** 🔐 _sensitive_  
-   * Shared secret the real forwarder must present in an `X-Forward-Secret:`  
-   * header on every message it wants forwarded. This is the check a spoofer  
-   * cannot pass: the sender address and the Authentication-Results header are  
-   * both text a sender can forge. At least 32 characters; generate with  
-   * `openssl rand -hex 32`. Set in Infisical dev and prod; never commit a value.  
-   *   
-   * Optional on purpose: unset, empty or shorter than 32 characters disables  
-   * forwarding entirely, and does not affect ordinary inbound mail. Read from the  
-   * email() handler's `env`, so it is also declared in worker-secret-vars.d.ts.  
-   * ![icon](data:image/svg+xml;utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2220%22%20height%3D%2220%22%20viewBox%3D%220%200%2032%2032%22%3E%3Cpath%20fill%3D%22%23808080%22%20d%3D%22M29%2022h-5a2.003%202.003%200%200%201-2-2v-6a2%202%200%200%201%202-2h5v2h-5v6h5ZM18%2012h-4V8h-2v14h6a2.003%202.003%200%200%200%202-2v-6a2%202%200%200%200-2-2m-4%208v-6h4v6Zm-6-8H3v2h5v2H4a2%202%200%200%200-2%202v2a2%202%200%200%200%202%202h6v-8a2%202%200%200%200-2-2m0%208H4v-2h4Z%22%2F%3E%3C%2Fsvg%3E)   
-   */
-  FORWARD_SECRET?: string;
-  
-  /**
    * **RESEND_KEY** 🔐 _sensitive_  
-   * Used only on the forward-on path, for a FORWARD_SENDER message carrying  
-   * FORWARD_SECRET to an inbox that has a receiver set. Ordinary inbound mail  
+   * Used only on the forward-on path, for an authenticated FORWARD_SENDER message  
+   * to an inbox that has a receiver set. Ordinary inbound mail  
    * never touches Resend.  
    * ![icon](data:image/svg+xml;utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2220%22%20height%3D%2220%22%20viewBox%3D%220%200%2032%2032%22%3E%3Cpath%20fill%3D%22%23808080%22%20d%3D%22M29%2022h-5a2.003%202.003%200%200%201-2-2v-6a2%202%200%200%201%202-2h5v2h-5v6h5ZM18%2012h-4V8h-2v14h6a2.003%202.003%200%200%200%202-2v-6a2%202%200%200%200-2-2m-4%208v-6h4v6Zm-6-8H3v2h5v2H4a2%202%200%200%200-2%202v2a2%202%200%200%200%202%202h6v-8a2%202%200%200%200-2-2m0%208H4v-2h4Z%22%2F%3E%3C%2Fsvg%3E)   
    *   
@@ -183,11 +170,11 @@ export type CoercedEnvSchema = {
   
 };
 
-type _CoercedEnvSchema_d3c3687b = CoercedEnvSchema;
+type _CoercedEnvSchema_ebbe7096 = CoercedEnvSchema;
 
 declare module 'varlock/env' {
-  export interface TypedEnvSchema extends Readonly<_CoercedEnvSchema_d3c3687b> {}
-  export interface PublicTypedEnvSchema extends Readonly<Pick<_CoercedEnvSchema_d3c3687b, 'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY' | 'NEXT_PUBLIC_CLERK_SIGN_IN_URL' | 'PUSHER_KEY' | 'PUSHER_CLUSTER' | 'BEAMS_INSTANCE_ID' | 'NEXTJS_ENV'>> {}
+  export interface TypedEnvSchema extends Readonly<_CoercedEnvSchema_ebbe7096> {}
+  export interface PublicTypedEnvSchema extends Readonly<Pick<_CoercedEnvSchema_ebbe7096, 'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY' | 'NEXT_PUBLIC_CLERK_SIGN_IN_URL' | 'PUSHER_KEY' | 'PUSHER_CLUSTER' | 'BEAMS_INSTANCE_ID' | 'NEXTJS_ENV'>> {}
 }
 
 
@@ -197,17 +184,17 @@ export type EnvSchemaAsStrings = {
       : (NonNullable<CoercedEnvSchema[Property]> extends boolean ? ('true' | 'false') : string)
 };
 
-type _EnvSchemaAsStrings_d3c3687b = EnvSchemaAsStrings;
+type _EnvSchemaAsStrings_ebbe7096 = EnvSchemaAsStrings;
 declare global {
 
   // add types for global import.meta.env
-  interface ImportMetaEnv extends _EnvSchemaAsStrings_d3c3687b {}
+  interface ImportMetaEnv extends _EnvSchemaAsStrings_ebbe7096 {}
   interface ImportMeta {
     readonly env: ImportMetaEnv;
   }
 
   // add types for global process.env
   namespace NodeJS {
-    interface ProcessEnv extends _EnvSchemaAsStrings_d3c3687b {}
+    interface ProcessEnv extends _EnvSchemaAsStrings_ebbe7096 {}
   }
 }

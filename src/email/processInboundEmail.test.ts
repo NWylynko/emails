@@ -3,6 +3,10 @@
  * mailparser `receiveEmail()` uses. The point is the end-to-end property: a
  * message that only CLAIMS to be from FORWARD_SENDER is stored and notified
  * like any other inbound mail, and nothing is sent through Resend.
+ *
+ * `message.headers` is built the way Cloudflare Email Routing presents it:
+ * the platform's own `Authentication-Results` (when given) prepended above
+ * every header the sender wrote into the raw message.
  */
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
@@ -16,19 +20,23 @@ import {
 const SENDER = "sender@example.com";
 const INBOX = "shop@inbox.example";
 const RECEIVER = "receiver@example.net";
-// Test value only. The real FORWARD_SECRET lives in Infisical.
-const SECRET = "test-forward-secret-0123456789abcdef";
-const SECRET_HEADER = `X-Forward-Secret: ${SECRET}\r\n`;
 
-const CLOUDFLARE_PASS =
+/** What Cloudflare prepends for a genuine message from SENDER. */
+const PLATFORM_PASS =
+  "mx.cloudflare.net; dkim=pass header.d=example.com header.s=s1; " +
+  "dmarc=pass header.from=example.com policy.dmarc=reject; " +
+  "spf=pass smtp.mailfrom=sender@example.com";
+
+/** What Cloudflare prepends for a spoof of SENDER. */
+const PLATFORM_FAIL =
+  "mx.cloudflare.net; dkim=none; dmarc=fail header.from=example.com policy.dmarc=none; " +
+  "spf=fail smtp.mailfrom=sender@example.com";
+
+/** Written by the sender into the raw message. */
+const FORGED_PASS_LINE =
   "Authentication-Results: mx.cloudflare.net; dkim=pass header.d=example.com header.s=s1;\r\n" +
   " dmarc=pass header.from=example.com policy.dmarc=reject;\r\n" +
   " spf=pass smtp.mailfrom=sender@example.com\r\n";
-
-const CLOUDFLARE_FAIL =
-  "Authentication-Results: mx.cloudflare.net; dkim=none;\r\n" +
-  " dmarc=fail header.from=example.com policy.dmarc=none;\r\n" +
-  " spf=fail smtp.mailfrom=sender@example.com\r\n";
 
 function mime(headers: string) {
   return (
@@ -42,10 +50,21 @@ function mime(headers: string) {
   );
 }
 
-function fakeDeps(
-  forwardSender: string | undefined,
-  forwardSecret: string | undefined
-) {
+/** `platformAuthenticationResults` first, then the raw message's headers. */
+function workerHeaders(raw: string, platformAuthenticationResults: string | null) {
+  const headers = new Headers();
+  if (platformAuthenticationResults !== null) {
+    headers.append("Authentication-Results", platformAuthenticationResults);
+  }
+  const block = raw.slice(0, raw.indexOf("\r\n\r\n")).replace(/\r\n[ \t]+/g, " ");
+  for (const line of block.split("\r\n")) {
+    const colon = line.indexOf(":");
+    headers.append(line.slice(0, colon), line.slice(colon + 1).trim());
+  }
+  return headers;
+}
+
+function fakeDeps(forwardSender: string | undefined) {
   const calls = {
     stored: [] as InboundMessage[],
     notified: [] as { emailId: number; title: string }[],
@@ -53,7 +72,6 @@ function fakeDeps(
   };
   const deps: InboundEmailDeps = {
     forwardSender,
-    forwardSecret,
     async storeEmail(message) {
       calls.stored.push(message);
       return { emailId: 42 };
@@ -74,19 +92,20 @@ function fakeDeps(
 
 async function run(
   raw: string,
-  forwardSender: string | undefined,
-  // Not a default parameter: an explicit `undefined` must mean "unset".
-  ...secret: [forwardSecret?: string | undefined]
+  platformAuthenticationResults: string | null,
+  forwardSender: string | undefined
 ) {
-  const forwardSecret = secret.length === 0 ? SECRET : secret[0];
-  const { deps, calls } = fakeDeps(forwardSender, forwardSecret);
+  const { deps, calls } = fakeDeps(forwardSender);
   const email = await simpleParser(raw);
-  await processInboundEmail({ from: SENDER, to: INBOX }, email, deps);
+  const headers = workerHeaders(raw, platformAuthenticationResults);
+  await processInboundEmail({ from: SENDER, to: INBOX, headers }, email, deps);
   return calls;
 }
 
 function assertStoredNotForwarded(calls: Awaited<ReturnType<typeof run>>) {
-  assert.deepEqual(calls.stored, [{ from: SENDER, to: INBOX }]);
+  assert.equal(calls.stored.length, 1);
+  assert.equal(calls.stored[0].from, SENDER);
+  assert.equal(calls.stored[0].to, INBOX);
   assert.deepEqual(calls.notified, [
     { emailId: 42, title: `New Email for ${INBOX}` },
   ]);
@@ -94,8 +113,8 @@ function assertStoredNotForwarded(calls: Awaited<ReturnType<typeof run>>) {
 }
 
 describe("processInboundEmail forwarding", () => {
-  test("FORWARD_SENDER with the correct secret is forwarded", async () => {
-    const calls = await run(mime(SECRET_HEADER + CLOUDFLARE_PASS), SENDER);
+  test("platform dmarc=pass for the configured sender's domain, with matching envelope and From, is forwarded", async () => {
+    const calls = await run(mime(""), PLATFORM_PASS, SENDER);
     assert.equal(calls.stored.length, 1);
     assert.deepEqual(calls.sent, ["proxy-to-receiver"]);
     assert.deepEqual(calls.notified, [
@@ -103,46 +122,29 @@ describe("processInboundEmail forwarding", () => {
     ]);
   });
 
-  test("a forged mx.cloudflare.net dmarc=pass header with no secret is stored as normal mail and not forwarded", async () => {
-    // Spoofed address plus a forged Authentication-Results, and nothing else.
-    // Whether Cloudflare would add its own header above this one is not
-    // verified, so this must be refused on the secret alone.
-    assertStoredNotForwarded(await run(mime(CLOUDFLARE_PASS), SENDER));
-  });
-
-  test("a forged mx.cloudflare.net dmarc=pass header with a wrong secret is stored as normal mail and not forwarded", async () => {
-    const wrong = "X-Forward-Secret: wrong-secret-0123456789abcdef0123\r\n";
-    assertStoredNotForwarded(await run(mime(wrong + CLOUDFLARE_PASS), SENDER));
-  });
-
-  test("nothing is forwarded when FORWARD_SECRET is unset or empty", async () => {
-    const raw = mime(SECRET_HEADER + CLOUDFLARE_PASS);
-    assertStoredNotForwarded(await run(raw, SENDER, undefined));
-    assertStoredNotForwarded(await run(raw, SENDER, ""));
-  });
-
-  test("the correct secret is still refused when Cloudflare's header shows a DMARC fail", async () => {
+  test("a forged mx.cloudflare.net dmarc=pass in the raw message is not forwarded when the platform's header says dmarc=fail", async () => {
     assertStoredNotForwarded(
-      await run(mime(SECRET_HEADER + CLOUDFLARE_FAIL), SENDER)
+      await run(mime(FORGED_PASS_LINE), PLATFORM_FAIL, SENDER)
     );
   });
 
-  test("a faked sender that fails DMARC is stored as normal mail and not forwarded", async () => {
-    assertStoredNotForwarded(await run(mime(CLOUDFLARE_FAIL), SENDER));
-  });
-
-  test("a faked sender with a forged pass header under the real one is not forwarded", async () => {
-    const forged = CLOUDFLARE_PASS; // written by the attacker, sits below Cloudflare's
-    assertStoredNotForwarded(await run(mime(CLOUDFLARE_FAIL + forged), SENDER));
-  });
-
-  test("a faked sender with no Authentication-Results is not forwarded", async () => {
-    assertStoredNotForwarded(await run(mime(""), SENDER));
+  test("missing platform signal does not forward", async () => {
+    assertStoredNotForwarded(await run(mime(""), null, SENDER));
   });
 
   test("nothing is forwarded when FORWARD_SENDER is unset or empty", async () => {
-    const raw = mime(SECRET_HEADER + CLOUDFLARE_PASS);
-    assertStoredNotForwarded(await run(raw, undefined));
-    assertStoredNotForwarded(await run(raw, ""));
+    assertStoredNotForwarded(await run(mime(""), PLATFORM_PASS, undefined));
+    assertStoredNotForwarded(await run(mime(""), PLATFORM_PASS, ""));
+  });
+
+  test("platform dmarc=pass does not help when the envelope sender is someone else", async () => {
+    const { deps, calls } = fakeDeps(SENDER);
+    const raw = mime("");
+    await processInboundEmail(
+      { from: "other@example.com", to: INBOX, headers: workerHeaders(raw, PLATFORM_PASS) },
+      await simpleParser(raw),
+      deps
+    );
+    assert.deepEqual(calls.sent, []);
   });
 });

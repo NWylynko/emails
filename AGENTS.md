@@ -612,30 +612,50 @@ prior fetch has initialized it and the same code works, which makes the bug
 look intermittent. This took down mail for ~15 minutes during the 2026-08-11
 cutover; `worker-secret-vars.d.ts` documents the rule.
 
-**Forwarding needs a shared secret, not just the right address.** Mail is
-forwarded through Resend only when `decideForward()`
-(`src/email/forwardAuthorization.ts`) passes: `FORWARD_SENDER` and
-`FORWARD_SECRET` are both set, the envelope sender and `From:` both equal
-`FORWARD_SENDER`, and the message carries exactly one `X-Forward-Secret:`
-header whose value equals `FORWARD_SECRET`. Unset or empty `FORWARD_SENDER`, or
-an unset, empty or under-32-character `FORWARD_SECRET`, means nothing is ever
-forwarded. Anything that fails is stored and notified as ordinary mail, and a
-`receiveEmail forward refused` line is logged (the presented secret is never
-logged).
+**Forwarding trusts only the header Cloudflare prepends, never the sender's
+text.** Mail is forwarded through Resend only when `decideForward()`
+(`src/email/forwardAuthorization.ts`) passes: `FORWARD_SENDER` is set, the
+envelope sender and the single `From:` address both equal it, and the FIRST
+`Authentication-Results` in the Worker's `message.headers` has authserv-id
+`mx.cloudflare.net` and exactly one DMARC result, `dmarc=pass` with
+`header.from` equal to `FORWARD_SENDER`'s domain. Unset or empty
+`FORWARD_SENDER` means nothing is ever forwarded. So does a message with no
+`Authentication-Results` in `message.headers` (fail closed). Anything that fails
+is stored and notified as ordinary mail, and a `receiveEmail forward refused`
+line with the reason is logged.
 
-**The secret is the security boundary; `Authentication-Results` is not.** The
-same function also requires the topmost `Authentication-Results` header to
-read `mx.cloudflare.net; dmarc=pass` with an aligned SPF or DKIM pass, but a
-sender can write that header themselves. Whether Email Routing prepends its own
-header above the sender's in `message.raw`, or strips forged ones, has **not**
-been verified. A forged-header-only message forwarded before the secret was
-added. Never relax the secret check on the strength of the header check.
+Why that header can be trusted: Cloudflare's Email Workers reference
+("Authentication results" on the email-handler page under
+developers.cloudflare.com/email-service/api/route-emails/) says Email Routing
+validates DMARC before invoking the Worker and **prepends** its own
+`Authentication-Results`. It says to read the first one through
+`message.headers` and check the `mx.cloudflare.net` authserv-id, and that other
+copies may be sender-supplied. A sender's forged
+`mx.cloudflare.net; dmarc=pass` therefore always sits below the platform's.
+`Headers.get()` joins repeats with ", ", so `firstHeaderValue()` cuts at the
+first comma. RFC 8601 has no bare commas, so whatever is kept is the
+platform's own text.
 
-Headers are read from mailparser's ordered `headerLines`, not
-`message.headers`, because `Headers.get()` merges repeated headers. The
-pipeline lives in `processInboundEmail()` with its side effects injected, so
+Rules that keep this sound:
+
+- **Never read `Authentication-Results` from `message.raw` / mailparser for the
+  decision.** The raw message is the sender's text. An earlier version did
+  exactly that and a forged header on its own got mail forwarded.
+- **The trust rests on Cloudflare always prepending.** If the Worker were ever
+  invoked without the platform header, a sender's copy would be first, and
+  nothing in the message tells those cases apart. Not verified against live
+  mail; check it with one real forward and one spoof to a muted inbox.
+- **This authenticates the domain, not the mailbox.** DMARC pass means the
+  message really came from `FORWARD_SENDER`'s domain. Anything that can send
+  DMARC-passing mail as that domain (another mailbox on it, or a service its
+  SPF/DKIM authorises) gets through too.
+- There is no shared-secret header. The forwarder is an ordinary mailbox that
+  cannot add custom headers, so a secret-header scheme made forwarding
+  unusable and was removed.
+
+The pipeline lives in `processInboundEmail()` with its side effects injected, so
 `processInboundEmail.test.ts` covers this without a database. Never put the
-real sender address or secret in the repo; they live in Infisical only.
+real sender address in the repo; it lives in Infisical only.
 
 The cheapest live end-to-end test: mute an inbox
 (`PUT /v1/inboxes/<to> {"silent": true}` — it upserts), send real mail to it

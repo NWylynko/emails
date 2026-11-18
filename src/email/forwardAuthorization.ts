@@ -5,67 +5,63 @@
  * `FORWARD_SENDER` is instead sent on, through Resend, to that inbox's
  * receiver. That makes the forward path an open relay for anyone who can pass
  * as that sender. The envelope sender (`message.from`, SMTP MAIL FROM), the
- * `From:` header and every other header in the message are whatever the
- * sending server says they are, so none of them proves anything by itself.
+ * `From:` header and everything in `message.raw` are whatever the sending
+ * server says they are, so none of them proves anything by itself.
  *
- * So a forward needs ALL of:
+ * The proof is the `Authentication-Results` header that Cloudflare Email
+ * Routing adds itself after it has checked SPF, DKIM and DMARC. Cloudflare's
+ * Email Workers reference ("Authentication results", under
+ * developers.cloudflare.com/email-service/api/route-emails/email-handler/)
+ * says Email Routing validates DMARC before invoking the Worker and PREPENDS
+ * that header, and that the Worker should read the FIRST
+ * `Authentication-Results` through `message.headers` and check that its
+ * authserv-id is `mx.cloudflare.net`. "Other `Authentication-Results` headers
+ * may have been supplied by the sender and should not be trusted."
+ *
+ * So a sender can write as many `Authentication-Results: mx.cloudflare.net;
+ * dmarc=pass` headers as they like. Every one of them sits BELOW the header the
+ * platform prepends, and only the first one is read.
+ *
+ * A forward needs ALL of:
  *
  * 1. `FORWARD_SENDER` is set to a usable address. Unset or empty means no
  *    forwarding at all. There is no default.
- * 2. `FORWARD_SECRET` is set, at least `MIN_FORWARD_SECRET_LENGTH`
- *    characters long. Unset, empty or short means no forwarding at all.
- * 3. The envelope sender and the single `From:` header address both equal
+ * 2. The envelope sender and the single `From:` header address both equal
  *    `FORWARD_SENDER`.
- * 4. The message has exactly one `X-Forward-Secret` header
- *    (`FORWARD_SECRET_HEADER`), and its value equals `FORWARD_SECRET`.
- * 5. The topmost `Authentication-Results` header (RFC 8601) has authserv-id
- *    `mx.cloudflare.net` and reports `dmarc=pass` for the sender's domain
- *    (`header.from`).
- * 6. The same header reports an aligned pass: `spf=pass` whose
- *    `smtp.mailfrom` is in that domain, or `dkim=pass` whose `header.d` is
- *    that domain.
+ * 3. `message.headers` has an `Authentication-Results`. Without one the
+ *    platform signal is missing, so nothing is forwarded (fail closed).
+ * 4. The first one (`firstHeaderValue`) has authserv-id `mx.cloudflare.net`.
+ * 5. It reports exactly one DMARC result, and that result is `dmarc=pass`
+ *    with `header.from` equal to the sender's domain. A DMARC pass already
+ *    means an aligned SPF or DKIM pass, so those are not checked separately.
+ *    More than one DMARC result is refused as ambiguous.
  *
- * **The secret (4) is the security boundary.** Checks 5 and 6 read a header
- * the sender can write: anyone can put
- * `Authentication-Results: mx.cloudflare.net; dmarc=pass ...` in their own
- * message. Whether Cloudflare Email Routing adds its own header above the
- * sender's in `message.raw`, or strips forged ones, has NOT been verified. If
- * it does neither, a forged header is the topmost one and passes 5 and 6. So
- * 5 and 6 are defence in depth only. They can refuse a message, but passing
- * them proves nothing, and nothing is forwarded without the secret.
+ * What this rests on: Cloudflare's documented guarantee that it prepends its
+ * header to every message before invoking the Worker. A message with no
+ * `Authentication-Results` at all fails closed. But if Cloudflare ever invoked
+ * the Worker WITHOUT prepending, a header the sender wrote would be the first
+ * one, and nothing in the message can tell that case apart. Not verified
+ * against live mail.
+ *
+ * Note what this proves: Cloudflare saw the message pass DMARC for
+ * `FORWARD_SENDER`'s DOMAIN. Anything that can send DMARC-passing mail as that
+ * domain (another mailbox on it, or a service its SPF/DKIM authorises) passes
+ * too. The local part is matched by check 2 only.
  *
  * Anything that fails is a refusal. The message is still stored and notified
  * as ordinary inbound mail. Only the forward is skipped.
  *
- * The secret header is never stored (only body, HTML and subject are) and is
- * not copied into the forwarded message (only subject, text and attachments
- * are), so it does not leak to the inbox's receiver. It is never logged.
- *
- * Headers are read from the parsed raw message's ordered header lines, not
- * `message.headers`: `Headers.get()` joins repeated headers with ", ", which
- * merges a second copy into the first with no reliable boundary. That is also
- * how a duplicated `X-Forward-Secret` is detected and refused.
+ * `Authentication-Results` is NEVER read from `message.raw` / mailparser here.
+ * The raw message is the sender's text, and an earlier version of this code
+ * trusted a header in it.
  *
  * This module has no Worker or Node dependencies so it can be unit tested
  * directly.
  */
 
 /**
- * The header the real forwarder must send, carrying `FORWARD_SECRET`.
- * Lowercase, because that is how mailparser keys `headerLines`.
- */
-export const FORWARD_SECRET_HEADER = "x-forward-secret";
-
-/**
- * A shorter `FORWARD_SECRET` is treated as unset. Generate one with
- * `openssl rand -hex 32`.
- */
-export const MIN_FORWARD_SECRET_LENGTH = 32;
-
-/**
- * The authserv-id expected on Cloudflare Email Routing's
- * `Authentication-Results` header. Not verified against live mail, and a
- * sender can write it too, so it is never sufficient. See the module comment.
+ * The authserv-id Cloudflare Email Routing writes on the header it prepends.
+ * From Cloudflare's Email Workers docs (see the module comment).
  */
 export const TRUSTED_AUTHSERV_ID = "mx.cloudflare.net";
 
@@ -75,35 +71,27 @@ export type ForwardDecision =
       forward: false;
       reason:
         | "forward-sender-not-configured"
-        | "forward-secret-not-configured"
         | "sender-mismatch"
-        | "forward-secret-mismatch"
-        | "missing-authentication-results"
+        | "missing-platform-authentication-results"
         | "untrusted-authserv-id"
-        | "dmarc-not-pass"
-        | "no-aligned-spf-or-dkim-pass";
+        | "ambiguous-dmarc-result"
+        | "dmarc-not-pass";
     };
 
 export interface ForwardAuthorizationInput {
   /** `FORWARD_SENDER` from the Worker env. May be undefined or empty. */
   forwardSender: string | undefined;
-  /** `FORWARD_SECRET` from the Worker env. May be undefined or empty. */
-  forwardSecret: string | undefined;
-  /**
-   * Values of every `X-Forward-Secret` header in the message, in order,
-   * without the header name.
-   */
-  presentedSecrets: string[];
   /** SMTP envelope sender, i.e. `message.from`. */
   envelopeFrom: string;
   /** Every address in the parsed `From:` header. */
   headerFromAddresses: string[];
   /**
-   * Values of every `Authentication-Results` header, in the order they appear
-   * in the message (topmost first), without the `Authentication-Results:`
-   * name.
+   * `message.headers.get("authentication-results")` from the Worker's
+   * `EmailMessage`, exactly as returned: null when absent, and every copy
+   * joined with ", " when the message has several. Never a value read from
+   * `message.raw`.
    */
-  authenticationResults: string[];
+  platformAuthenticationResults: string | null;
 }
 
 export interface AuthenticationResult {
@@ -138,24 +126,28 @@ export function normaliseForwardSender(
 }
 
 /**
- * Returns the trimmed `FORWARD_SECRET`, or null when it is unset, empty or
- * shorter than `MIN_FORWARD_SECRET_LENGTH`. Null means "never forward".
+ * The first header out of a `Headers.get()` value, or null if there is none.
+ *
+ * `Headers.get()` joins repeated headers with ", ", and the platform's header
+ * is the first. The cut is made at the FIRST comma, ignoring quotes and
+ * comments. That way the kept text can only be part of the platform's own
+ * header. A smarter split that tracked quotes or comments could be pushed past
+ * the boundary into the sender's copy by a stray quote or parenthesis.
+ * RFC 8601 syntax has no bare commas, so this cuts nothing from a well-formed
+ * header. If Cloudflare ever writes a comma, the cut falls inside its own
+ * header. Results after the comma are lost and the message fails closed.
  */
-export function normaliseForwardSecret(value: string | undefined): string | null {
-  if (typeof value !== "string") return null;
-  const secret = value.trim();
-  return secret.length >= MIN_FORWARD_SECRET_LENGTH ? secret : null;
+export function firstHeaderValue(joined: string | null): string | null {
+  if (joined === null) return null;
+  const comma = joined.indexOf(",");
+  const first = (comma === -1 ? joined : joined.slice(0, comma)).trim();
+  return first === "" ? null : first;
 }
 
 export function decideForward(input: ForwardAuthorizationInput): ForwardDecision {
   const sender = normaliseForwardSender(input.forwardSender);
   if (sender === null) {
     return { forward: false, reason: "forward-sender-not-configured" };
-  }
-
-  const expectedSecret = normaliseForwardSecret(input.forwardSecret);
-  if (expectedSecret === null) {
-    return { forward: false, reason: "forward-secret-not-configured" };
   }
 
   const envelopeFrom = input.envelopeFrom.trim().toLowerCase();
@@ -170,54 +162,31 @@ export function decideForward(input: ForwardAuthorizationInput): ForwardDecision
     return { forward: false, reason: "sender-mismatch" };
   }
 
-  // The security boundary. Exactly one header, so a sender cannot try several
-  // values in one message, and so an ambiguous message is refused.
-  if (
-    input.presentedSecrets.length !== 1 ||
-    !timingSafeEqual(input.presentedSecrets[0].trim(), expectedSecret)
-  ) {
-    return { forward: false, reason: "forward-secret-mismatch" };
-  }
-
-  // Defence in depth only: the sender can write this header. See the module
-  // comment.
-  const topmost = input.authenticationResults[0];
-  if (topmost === undefined) {
-    return { forward: false, reason: "missing-authentication-results" };
-  }
-
-  const parsed = parseAuthenticationResults(topmost);
+  const first = firstHeaderValue(input.platformAuthenticationResults);
+  const parsed = first === null ? null : parseAuthenticationResults(first);
   if (parsed === null) {
-    return { forward: false, reason: "missing-authentication-results" };
+    return { forward: false, reason: "missing-platform-authentication-results" };
   }
   if (parsed.authservId !== TRUSTED_AUTHSERV_ID) {
     return { forward: false, reason: "untrusted-authserv-id" };
   }
 
-  const dmarcPass = parsed.results.some(
-    (r) =>
-      r.method === "dmarc" &&
-      r.result === "pass" &&
-      r.properties["header.from"] === sender.domain
-  );
-  if (!dmarcPass) {
-    return { forward: false, reason: "dmarc-not-pass" };
+  // Exactly one. If a value Cloudflare copied from the message (a DKIM
+  // selector, say) ever smuggled in a second "dmarc=" result, it is refused
+  // rather than letting the two compete.
+  const dmarc = parsed.results.filter((r) => r.method === "dmarc");
+  if (dmarc.length !== 1) {
+    return {
+      forward: false,
+      reason:
+        dmarc.length === 0 ? "dmarc-not-pass" : "ambiguous-dmarc-result",
+    };
   }
-
-  const spfAligned = parsed.results.some(
-    (r) =>
-      r.method === "spf" &&
-      r.result === "pass" &&
-      domainOf(r.properties["smtp.mailfrom"]) === sender.domain
-  );
-  const dkimAligned = parsed.results.some(
-    (r) =>
-      r.method === "dkim" &&
-      r.result === "pass" &&
-      r.properties["header.d"] === sender.domain
-  );
-  if (!spfAligned && !dkimAligned) {
-    return { forward: false, reason: "no-aligned-spf-or-dkim-pass" };
+  if (
+    dmarc[0].result !== "pass" ||
+    dmarc[0].properties["header.from"] !== sender.domain
+  ) {
+    return { forward: false, reason: "dmarc-not-pass" };
   }
 
   return { forward: true, reason: "authenticated" };
@@ -267,23 +236,6 @@ export function parseAuthenticationResults(
   }
 
   return { authservId, results };
-}
-
-/** Constant-time for equal lengths, like `authorizeApiToken`'s. */
-function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let mismatch = 0;
-  for (let i = 0; i < a.length; i++) {
-    mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
-  return mismatch === 0;
-}
-
-/** `user@example.com` -> `example.com`; a bare domain is returned as is. */
-function domainOf(value: string | undefined): string | undefined {
-  if (value === undefined) return undefined;
-  const at = value.lastIndexOf("@");
-  return at === -1 ? value : value.slice(at + 1);
 }
 
 function unquote(value: string): string {
