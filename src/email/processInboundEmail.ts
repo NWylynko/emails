@@ -33,6 +33,10 @@ export interface InboundMessage {
 export interface InboundEmailDeps {
   /** `FORWARD_SENDER`. Unset or empty disables forwarding entirely. */
   forwardSender: string | undefined;
+  /** `MAIL_FROM`: the From address for the pipeline's own error replies. */
+  systemSender: string;
+  /** `SITE_URL`: public origin of the website, no trailing slash. */
+  siteUrl: string;
   /** INSERT the message and its attachments. */
   storeEmail(
     message: InboundMessage,
@@ -128,7 +132,7 @@ export async function processInboundEmail(
   // than silently dropping the message.
   if (inbox === undefined || inbox === null) {
     await deps.send("inbox-not-found", {
-      from: "nick@wylynko.me",
+      from: deps.systemSender,
       to: forwardSender,
       subject: `Inbox not found for ${message.to}`,
       text: `Inbox not found for ${message.to}`,
@@ -138,17 +142,17 @@ export async function processInboundEmail(
 
   if (inbox.receiver === null || inbox.receiver === undefined) {
     await deps.send("no-receiver-set", {
-      from: "nick@wylynko.me",
+      from: deps.systemSender,
       to: forwardSender,
       subject: `No Receiver set for ${message.to} inbox`,
-      text: `Set a receiver for this inbox by going to https://emails.wylynko.me/inbox/${message.to}`,
+      text: `Set a receiver for this inbox by going to ${deps.siteUrl}/inbox/${message.to}`,
     });
     return;
   }
 
   if (email.text === undefined || email.text.trim() === "") {
     await deps.send("no-text-in-email", {
-      from: "nick@wylynko.me",
+      from: deps.systemSender,
       to: forwardSender,
       subject: "No text in the email",
       text: "No text in the email",

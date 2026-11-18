@@ -22,7 +22,7 @@ impl Config {
         std::env::var("EMAILS_DOMAIN")
             .ok()
             .or_else(|| load_file_config().ok().and_then(|f| f.domain))
-            .unwrap_or_else(|| "wylynko.me".to_string())
+            .unwrap_or_else(|| "example.com".to_string())
     }
 
     pub fn load() -> Result<Self> {

@@ -2,13 +2,13 @@
 
 Keep this file up to date.
 
-Disposable-inbox email system for `*@wylynko.me`. **One Cloudflare Worker** serves
+Disposable-inbox email system for a catch-all domain. **One Cloudflare Worker** serves
 both the website and inbound mail — this repo is the merge of what used to be
 three: `email-service` (Worker), `email-client` (Next.js on Vercel) and
 `emails-cli` (Rust). Those still exist on GitHub, unarchived, as the pre-merge
 history.
 
-**The cutover happened on 2026-08-11**: `emails.wylynko.me` is a Custom Domain
+**The cutover is done**: the production hostname is a Custom Domain
 on the `emails` Worker (the Vercel deployment is deleted), and both Email
 Routing rules deliver to this Worker's `email()` handler. The old
 `email-service` Worker may still exist, unrouted, until it is decommissioned (ops step). See
@@ -114,6 +114,20 @@ together. A failed `email()` handler is the quiet one of the three — senders
 retry, rows duplicate, and nothing looks wrong from a browser. Tail the Worker
 after deploying and watch a delivery land.
 
+## Deployment identity — no real domain is committed
+
+The repo names no real domain. Three values carry it:
+
+- `SITE_URL` and `MAIL_FROM` (`.env.schema`, Infisical dev + prod, synced to the
+  Worker store) — the website origin used in notification links and error-reply
+  mail, and the From address for the handler's own replies. Both are required, so
+  a build without them fails rather than deploying links to `undefined`.
+- The `env.production.routes` Custom Domain in `wrangler.jsonc` is the
+  placeholder `emails.example.com`. wrangler config cannot read env vars, so
+  **set it to the real hostname before deploying**; a deploy with the placeholder
+  will fail to attach the domain rather than silently serve the wrong site.
+- The CLI reads its domain from `EMAILS_DOMAIN` or `domain` in its config file.
+
 ## Databases — read this before running anything
 
 Two Neon databases, and they are **not** the same:
@@ -125,7 +139,7 @@ Two Neon databases, and they are **not** the same:
 
 `wrangler.jsonc` has no top-level bindings: `env.development` (`emails-dev`
 Worker, dev Hyperdrive) and `env.production` (`emails` Worker, prod Hyperdrive,
-`emails.wylynko.me` custom domain) each carry their own. Verified safety
+custom domain) each carry their own. Verified safety
 properties:
 
 - **`wrangler dev` cannot reach production.** Miniflare refuses to use a remote
@@ -133,8 +147,8 @@ properties:
   `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE`. That variable
   lives in Infisical's dev environment and points at `ep-twilight-sunset`.
 
-  The dev branch is disposable and has been recreated before (it was
-  `ep-flat-king-a7yv3mu7` until 2026-08-11). Deleting it does not fail loudly:
+  The dev branch is disposable and has been recreated before (its endpoint
+  has changed before). Deleting it does not fail loudly:
   Neon's proxy cannot route to a dead endpoint, so every query comes back
   `28P01 password authentication failed` — which reads as a stale credential,
   not a missing database. Recreate either by branching from production or, since
@@ -148,7 +162,7 @@ properties:
 - **`wrangler dev --remote` DOES use the deployed Hyperdrive config.** Never use
   that flag on this project.
 - **Hyperdrive query caching must stay disabled** on the prod config
-  (`caching: {disabled: true}`, set 2026-08-11). It once had `max_age: 3600`,
+  (`caching: {disabled: true}`, set once). It once had `max_age: 3600`,
   which served the homepage's inbox-list aggregate from an hour-old snapshot
   while the per-inbox query (a different cache key) looked fresh — new mail
   notified instantly but never reordered the list. Looks exactly like a Next.js
@@ -187,7 +201,7 @@ drizzle-kit need `MIGRATIONS_DATABASE_URL`?
 **Because Hyperdrive is a Worker binding.** It exists only inside a running
 Worker. A CI build container or a laptop has nothing to connect *through*. And
 the password cannot be recovered to make a direct connection instead: the
-Cloudflare API omits it entirely (verified 2026-08-17 against the raw API — the
+Cloudflare API omits it entirely (verified against the raw API — the
 field is absent, not redacted). So `MIGRATIONS_DATABASE_URL` is a second,
 *readable* copy of a credential that already exists but is write-only.
 
@@ -275,7 +289,7 @@ embeddings. `emails.search` is a generated `tsvector` column with a GIN index,
 maintained by Postgres itself, which is why adding search required no change to
 the inbound `email()` path at all.
 
-That is a size judgement, not an ideological one: production held roughly 3,700
+That is a size judgement, not an ideological one: production held a few thousand
 emails when this was built. Measured on the real schema with 20k seeded rows, a
 ranked top-50 query plans as a `Bitmap Index Scan on "emailSearchIdx"` and
 executes in 3.4ms. Revisit if the corpus grows by orders of magnitude or if
@@ -424,7 +438,8 @@ run at once.
 Both bind `0.0.0.0`, not localhost, because this box is developed on remotely:
 `dev.ip` in `wrangler.jsonc` for the wrangler side, `-H 0.0.0.0` for Next.
 `allowedDevOrigins` in `next.config.ts` must also list the hostname you browse
-from, or Next rejects the cross-origin dev request.
+from, or Next rejects the cross-origin dev request. Set `ALLOWED_DEV_ORIGINS`
+(comma-separated) in your shell for any remote dev box.
 
 ### The build environment decides which Clerk instance you get
 
@@ -451,12 +466,12 @@ grep -rhoE 'pk_(live|test)_[A-Za-z0-9=]+' .open-next/assets/ | sort -u
 
 The old `preview` / `deploy` / `deploy:dev` / `dev:worker` / `cf:build` /
 `cf-typegen` scripts and the `scripts/` directory were deleted in the manual
-rework of 2026-08-10 — CI is the only build-and-deploy path now.
+manual rework — CI is the only build-and-deploy path now.
 
 **There are no `.env` files with values, and there is no `.dev.vars`.** Secrets
 live in Infisical (project "emails", environments `dev` and `prod`) and are
 injected by the Infisical CLI; `.env.schema` is the committed, value-free schema
-that varlock validates against. See `~/SECRETS.md` for the model.
+that varlock validates against. Nothing is written to disk.
 
 Every script is already wrapped in `infisical run`, so there is nothing to
 remember — but if you invoke a build or the Worker directly, wrap it yourself or
@@ -609,7 +624,7 @@ from the secret store) by OpenNext's fetch path only. On a cold isolate,
 `ENV.X` inside `email()` throws "varlock ENV not initialized" — *after* the
 INSERT, so Email Routing retries and duplicates the row. On a warm isolate a
 prior fetch has initialized it and the same code works, which makes the bug
-look intermittent. This took down mail for ~15 minutes during the 2026-08-11
+look intermittent. This took down mail for ~15 minutes during the
 cutover; `worker-secret-vars.d.ts` documents the rule.
 
 **Forwarding trusts only the header Cloudflare prepends, never the sender's
@@ -724,8 +739,7 @@ on rows Postgres actually returned. They fail with an explicit message rather
 than a confusing assertion if the corpus is missing.
 
 Anything needing a browser is still `pnpm dev` plus the Playwright MCP, which
-launches **headed** here, so bring up a display first
-(`~/.agent/skills/display`).
+launches **headed** here, so bring up a display first.
 
 **`tsc` can fail on a route that plainly exists.** Next writes route types to
 both `.next/types/` and `.next/dev/types/`, and `tsconfig.json` includes both.
@@ -734,8 +748,7 @@ run since a route was added, its stale `AppRoutes` union shadows the fresh one
 and `PageProps<"/your-new-route">` errors with *"does not satisfy the constraint
 AppRoutes"*. Delete `.next/dev/types` or start the dev server.
 
-The Playwright MCP here launches **headed**, so bring up a display first
-(`~/.agent/skills/display`) — headless is not an option with this MCP config.
+The Playwright MCP here launches **headed**, so bring up a display first — headless is not an option with this MCP config.
 
 To get a signed-in browser, mint a Clerk ticket (single-use):
 
@@ -789,7 +802,7 @@ Done:
 - Verified signed-in against the dev clone: inbox list, per-inbox list, text tab,
   HTML tab, AI tab (real summary, link preserved), and an attachment download
   that saved with the right filename. Zero server errors across the session.
-- **Secrets follow `~/SECRETS.md`**: nothing on disk, values in Infisical,
+- **Secrets**: nothing on disk, values in Infisical,
   `.env.schema` committed, varlock wired into Next and confirmed live by the
   "loaded by varlock" banner. The seven Pusher/Beams/Techulus credentials that
   were hardcoded in source are gone from the repo.
@@ -804,8 +817,8 @@ Done:
   both the website and `/v1`.
 - **Oversized-part pointers resolve on every read path.** `readEmailBody` /
   `readEmailHtml` in `src/email/emailQueries.ts` are the only sanctioned way to
-  read those columns. Verified by pointing email 3639's body at an R2 object and
-  confirming both `/v1/emails/3639` and the website's text tab render the R2
+  read those columns. Verified by pointing an email's body at an R2 object and
+  confirming both `/v1/emails/<id>` and the website's text tab render the R2
   contents rather than the `r2:...` string.
 - **The inbound `email()` handler now lives in this Worker** (`worker.ts` ->
   `src/email/receiveEmail.ts`), with the notification pair de-duplicated into
@@ -817,20 +830,19 @@ Done:
 - `/`, `/inbox/<email>`, `/email/<id>` verified working under `wrangler dev`.
 - Hyperdrive + drizzle + postgres.js proven inside a Next route.
 
-- **Cutover complete (2026-08-11).** Infisical -> Cloudflare secret sync live
+- **Cutover complete.** Infisical -> Cloudflare secret sync live
   (all 11 values in the Worker store). Workers Builds deploys on push to
-  `main`. `emails.wylynko.me` is a Custom Domain on the `emails` Worker and the
-  Vercel deployment is deleted. Both Email Routing rules (nick@ literal +
+  `main`. The production hostname is a Custom Domain on the `emails` Worker and the
+  Vercel deployment is deleted. Both Email Routing rules (a literal address +
   catch-all) deliver to this Worker. Verified live: Clerk redirect, sign-in
   page, `/v1` with the prod token against the prod database, and two real
-  inbound emails traced end to end in `wrangler tail` (rows 3664-3666 in
-  `cutover-test@wylynko.me` are the cutover's test artifacts).
+  inbound emails traced end to end in `wrangler tail`.
 - The cutover surfaced and fixed the varlock/`email()` cold-isolate bug — see
   "The mail handler".
 
 Not done:
 
-- **Production is migrated** (2026-11-14): the first `main` build after the
+- **Production is migrated**: the first `main` build after the
   dependency update ran `ci:migrate`, and drizzle-kit reported migrations
   applied. That build's deploy step then failed on the Access issue above, which
   is what `ci:deploy` fixes.

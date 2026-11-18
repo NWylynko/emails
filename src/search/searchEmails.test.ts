@@ -101,11 +101,11 @@ describe("searchEmails", () => {
   test("scopes results to a single inbox", async () => {
     // Deliberately a term the generated corpus also uses, so this exercises
     // real filtering rather than a term that happens to appear once.
-    const scoped = await searchEmails(db, { query: "cancel", inbox: "shopping@wylynko.me" });
+    const scoped = await searchEmails(db, { query: "cancel", inbox: "shopping@example.com" });
 
     assert.ok(scoped.length > 0, "the corpus has matching mail in this inbox");
     for (const row of scoped) {
-      assert.equal(row.to, "shopping@wylynko.me", "no other inbox may appear in scoped results");
+      assert.equal(row.to, "shopping@example.com", "no other inbox may appear in scoped results");
     }
 
     const unscoped = await searchEmails(db, { query: "cancel", limit: 200 });
@@ -117,7 +117,7 @@ describe("searchEmails", () => {
     // A token seeded into exactly one inbox must not surface in another.
     const wrongInbox = await searchEmails(db, {
       query: SEARCH_FIXTURES.uniqueToken.token,
-      inbox: "banking@wylynko.me",
+      inbox: "banking@example.com",
     });
     assert.equal(wrongInbox.length, 0, "the fixture must not leak into another inbox's results");
   });
