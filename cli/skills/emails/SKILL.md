@@ -1,7 +1,7 @@
 ---
 name: emails
 description: >-
-  Receive email on *@wylynko.me via the `emails` CLI (email-service API).
+  Receive email on *@wylynko.me via the `emails` CLI (the `/v1` API of the emails Worker).
   Use when an agent needs a disposable inbox, waits for a verification/signup
   email, lists or reads inbound mail, downloads attachments, or mutes an inbox.
 ---
@@ -17,7 +17,7 @@ Use the installed `emails` binary. Config lives in `~/.config/emails-cli/config.
 |---------|-------|
 | Skill | `~/.agent/skills/emails/` |
 | Binary | `emails` (`~/.cargo/bin/emails`) |
-| API | `https://email-service.nick-dev.workers.dev` |
+| API | `$EMAILS_API_URL` — the URL of your own deployment of this Worker (e.g. `https://emails.example.com`) |
 | Domain | `wylynko.me` (catch-all — any local part works) |
 | Config | `~/.config/emails-cli/config.toml` |
 

@@ -11,7 +11,7 @@ history.
 **The cutover happened on 2026-08-11**: `emails.wylynko.me` is a Custom Domain
 on the `emails` Worker (the Vercel deployment is deleted), and both Email
 Routing rules deliver to this Worker's `email()` handler. The old
-`email-service` Worker still exists, unrouted, until it is decommissioned. See
+`email-service` Worker may still exist, unrouted, until it is decommissioned (ops step). See
 "Migration status" at the bottom.
 
 ## Shape
@@ -58,7 +58,7 @@ rather than silently pointing the live Worker at the clone.
 command, which since OpenNext 1.20 starts `getPlatformProxy()` first just to
 read string vars. The `AI` binding can never be simulated locally, so that
 proxy always opens a remote session — uploading a preview Worker to
-`emails.nick-dev.workers.dev`, which is behind Cloudflare Access. In CI that
+the account's workers.dev preview URL, which is behind Cloudflare Access. In CI that
 fails with "behind Cloudflare Access, but no Access Service Token credentials
 were found", after the build and migrations have already succeeded.
 `OPEN_NEXT_DEPLOY=true` is the flag wrangler and OpenNext use between
@@ -791,8 +791,14 @@ Not done:
   is what `ci:deploy` fixes.
 - The Rust CLI has no `search` subcommand for `GET /v1/search`.
 
-- The old `email-service` Worker and the `email-client`/`email-cli` repos still
-  exist. Decommission/archive them once the new pipeline has soaked.
+- **Old Worker URLs removed from the repo (TASK-130).** The workers.dev hosts
+  for `email-service`, `emails` and `emails-dev` no longer appear in docs or
+  skills; `cli/skills/emails/SKILL.md` now says to use `$EMAILS_API_URL` for
+  your own deployment. Nothing should call the old `email-service` Worker.
+  Deleting the Cloudflare Workers (`email-service`, and `emails-dev` if
+  unneeded) is a separate ops step that has **not** been done from this repo
+  or by an agent; the old `email-client`/`email-cli` repos also still exist.
+  Check for callers before deleting, then archive/decommission.
 - The prod `RESEND_KEY` can send (verified) but its `/domains` listing is
   empty, so it may be a sending-only key. The forward-on path
   (`sendViaResend`) has not been exercised in prod since the cutover.
