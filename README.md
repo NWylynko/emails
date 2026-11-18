@@ -177,3 +177,7 @@ via Cloudflare Workers Builds.
 **Before changing anything, read [`AGENTS.md`](AGENTS.md).** It's the detailed
 operating manual — databases, migrations, deploys, secrets, and the many
 sharp edges found along the way.
+
+## License
+
+[AGPL-3.0](LICENSE). If you run a modified copy as a service for others, you must publish your changes.

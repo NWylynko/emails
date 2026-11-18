@@ -2,6 +2,7 @@
   "name": "emails",
   "version": "0.0.0",
   "private": true,
+  "license": "AGPL-3.0-only",
   "scripts": {
     "dev": "infisical run --env=dev --projectId=db9d19ba-bf66-41b9-995b-d297bdb9f182 -- next dev -H 0.0.0.0",
     "preview": "pnpm preview:build && infisical run --env=dev --projectId=db9d19ba-bf66-41b9-995b-d297bdb9f182 -- opennextjs-cloudflare preview --env=development",
