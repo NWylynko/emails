@@ -1,5 +1,7 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
+import { ENV } from "varlock/env";
+import { isUserAllowed, parseAllowedUserIds } from "./auth/allowlist";
 
 /**
  * `/v1` is public *to Clerk* only — it carries its own Bearer-token check in
@@ -13,11 +15,14 @@ const isPublicRoute = createRouteMatcher([
   "/v1(.*)",
 ]);
 
-const allowedUserIds = Object.freeze([
-  "user_2t6gJSoy2au2IcsGdNGFt32ZyQL",
-  "user_2t6im88Xhr78qDRQ4IKOZ1Ee146",
-  "user_3BaG0aVrzwkbCojh27ulpqFDleg"
-]);
+/**
+ * Clerk user IDs allowed in, from ALLOWED_USER_IDS (comma-separated). Empty or
+ * unset means nobody gets in — it never fails open. Read per request so the
+ * value is resolved on the fetch path, where varlock's ENV is initialised.
+ */
+function getAllowedUserIds(): string[] {
+  return parseAllowedUserIds(ENV.ALLOWED_USER_IDS);
+}
 
 export default clerkMiddleware(async (auth, request) => {
   if (isPublicRoute(request)) {
@@ -32,7 +37,7 @@ export default clerkMiddleware(async (auth, request) => {
     );
   }
 
-  if (allowedUserIds.includes(userId) === false) {
+  if (isUserAllowed(userId, getAllowedUserIds()) === false) {
     return NextResponse.redirect(
       new URL("/sign-in", request.nextUrl).toString()
     );
