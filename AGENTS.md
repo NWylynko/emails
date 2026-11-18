@@ -122,10 +122,11 @@ The repo names no real domain. Three values carry it:
   Worker store) — the website origin used in notification links and error-reply
   mail, and the From address for the handler's own replies. Both are required, so
   a build without them fails rather than deploying links to `undefined`.
-- The `env.production.routes` Custom Domain in `wrangler.jsonc` is the
-  placeholder `emails.example.com`. wrangler config cannot read env vars, so
-  **set it to the real hostname before deploying**; a deploy with the placeholder
-  will fail to attach the domain rather than silently serve the wrong site.
+- `wrangler.jsonc` has **no** `routes` in `env.production`. The Custom Domain is
+  attached in the Cloudflare dashboard. wrangler only calls the custom-domain
+  API when the config lists one, so omitting it leaves the dashboard domain
+  untouched (checked in wrangler 4.164). A placeholder like `emails.example.com`
+  fails the deploy with "Can't infer zone" (code 10082). Do not add one.
 - The CLI reads its domain from `EMAILS_DOMAIN` or `domain` in its config file.
 
 ## Databases — read this before running anything
