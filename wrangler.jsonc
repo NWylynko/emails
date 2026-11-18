@@ -43,7 +43,9 @@
       "name": "emails",
       "routes": [
         {
-          "pattern": "emails.wylynko.me",
+          // PLACEHOLDER: the real hostname is not committed. Set it to the
+          // production hostname (same value as SITE_URL) before deploying.
+          "pattern": "emails.example.com",
           "custom_domain": true
         }
       ],

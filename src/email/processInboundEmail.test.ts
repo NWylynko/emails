@@ -72,6 +72,8 @@ function fakeDeps(forwardSender: string | undefined) {
   };
   const deps: InboundEmailDeps = {
     forwardSender,
+    systemSender: "noreply@example.com",
+    siteUrl: "https://emails.example.com",
     async storeEmail(message) {
       calls.stored.push(message);
       return { emailId: 42 };

@@ -11,7 +11,7 @@ use client::ApiClient;
 use config::Config;
 
 #[derive(Parser, Debug)]
-#[command(name = "emails", about = "Receive *@wylynko.me mail for AI agents", version)]
+#[command(name = "emails", about = "Receive mail on your catch-all domain for AI agents", version)]
 struct Cli {
     /// Pretty human-readable output instead of JSON
     #[arg(long, global = true)]
@@ -32,7 +32,7 @@ enum Commands {
     Inboxes,
     /// List emails for an inbox address
     List {
-        /// Full address, e.g. agent-…@wylynko.me
+        /// Full address, e.g. agent-…@example.com
         to: String,
         #[arg(long, default_value_t = 50)]
         limit: u32,

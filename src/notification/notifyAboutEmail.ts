@@ -3,8 +3,8 @@
  * every browser / Home Screen web app registered on the "emails" interest.
  */
 
-function emailUrl(emailId: number) {
-  return `https://emails.wylynko.me/email/${emailId}`;
+function emailUrl(env: CloudflareEnv, emailId: number) {
+  return `${env.SITE_URL}/email/${emailId}`;
 }
 
 /**
@@ -33,7 +33,7 @@ async function sendToPusherBeams(
             notification: {
               title,
               body,
-              deep_link: emailUrl(emailId),
+              deep_link: emailUrl(env, emailId),
             },
           },
         }),
