@@ -50,5 +50,5 @@ emails wait "$ADDR" --timeout 180 --subject verify
 
 - Use a **new address per task** so `wait` is unambiguous.
 - Prefer body text from `wait` / `get`; avoid `--html` unless needed (large).
-- Mute agent inboxes so they do not push to Nick’s phone.
+- Mute agent inboxes so they do not push to your phone.
 - On timeout, `wait` exits non-zero with an error JSON on stderr.
