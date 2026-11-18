@@ -41,14 +41,11 @@
     },
     "production": {
       "name": "emails",
-      "routes": [
-        {
-          // PLACEHOLDER: the real hostname is not committed. Set it to the
-          // production hostname (same value as SITE_URL) before deploying.
-          "pattern": "emails.example.com",
-          "custom_domain": true
-        }
-      ],
+      // No "routes" on purpose. The production Custom Domain is attached in
+      // the Cloudflare dashboard, and the real hostname is not committed.
+      // wrangler only touches custom domains when the config lists one, so
+      // omitting this leaves the dashboard-managed domain alone. Do not add a
+      // placeholder here: it fails the deploy with "Can't infer zone" (10082).
       "assets": {
         "directory": ".open-next/assets",
         "binding": "ASSETS"
