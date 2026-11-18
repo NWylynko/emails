@@ -14,7 +14,7 @@ npx wrangler secret put API_TOKEN
 npx wrangler deploy
 ```
 
-3. Note the Worker URL (workers.dev or custom route).
+3. Note the Worker URL (your custom domain or workers.dev route).
 
 ## Install
 
@@ -25,14 +25,14 @@ cargo install --path .
 ## Configure
 
 ```bash
-export EMAILS_API_URL="https://email-service.<your-subdomain>.workers.dev"
+export EMAILS_API_URL="https://<your-emails-deployment>"
 export EMAILS_API_TOKEN="the-same-token"
 ```
 
 Or write `~/.config/emails-cli/config.toml`:
 
 ```toml
-api_url = "https://email-service.<your-subdomain>.workers.dev"
+api_url = "https://<your-emails-deployment>"
 api_token = "…"
 domain = "wylynko.me"
 ```
