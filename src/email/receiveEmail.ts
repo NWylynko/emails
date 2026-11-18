@@ -3,7 +3,8 @@
  *
  * Parse the message, store it, upload attachments to R2, ping the website, then
  * either forward it on or just notify. Forwarding happens only when the message
- * is from FORWARD_SENDER and carries FORWARD_SECRET — see `forwardAuthorization.ts`. The
+ * is from FORWARD_SENDER and Cloudflare's own Authentication-Results header
+ * says it passed DMARC for that domain — see `forwardAuthorization.ts`. The
  * pipeline itself is `processInboundEmail()`; this file wires it to the
  * Worker's bindings.
  *
@@ -34,7 +35,6 @@ export async function receiveEmail(
 
   await processInboundEmail(message, email, {
     forwardSender: env.FORWARD_SENDER,
-    forwardSecret: env.FORWARD_SECRET,
 
     async storeEmail() {
       // An inlined photo can push these past the varchar(1_000_000) columns

@@ -2,244 +2,196 @@ import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
   decideForward,
+  firstHeaderValue,
   normaliseForwardSender,
   parseAuthenticationResults,
   type ForwardAuthorizationInput,
 } from "./forwardAuthorization.ts";
 
 const SENDER = "sender@example.com";
-// Test value only. The real FORWARD_SECRET lives in Infisical.
-const SECRET = "test-forward-secret-0123456789abcdef";
 
-const PASSING_HEADER =
+/** What Cloudflare Email Routing prepends for a genuine message from SENDER. */
+const PLATFORM_PASS =
   "mx.cloudflare.net; dkim=pass header.d=example.com header.s=s1 header.b=abc; " +
   "dmarc=pass header.from=example.com policy.dmarc=reject; " +
   "spf=pass (mx.cloudflare.net: domain of sender@example.com designates 192.0.2.1 as permitted sender) " +
   "smtp.mailfrom=sender@example.com; arc=none smtp.remote-ip=192.0.2.1";
+
+/** What Cloudflare prepends for a spoof of SENDER. */
+const PLATFORM_FAIL =
+  "mx.cloudflare.net; dkim=none; dmarc=fail header.from=example.com policy.dmarc=none; " +
+  "spf=fail smtp.mailfrom=sender@example.com; arc=none smtp.remote-ip=198.51.100.7";
+
+/** A header a spoofer can write: Cloudflare's authserv-id and every pass. */
+const FORGED_PASS =
+  "mx.cloudflare.net; dkim=pass header.d=example.com; " +
+  "spf=pass smtp.mailfrom=sender@example.com; dmarc=pass header.from=example.com";
+
+/** `message.headers.get()` joins repeated headers like this. */
+function joined(...values: string[]): string {
+  const headers = new Headers();
+  for (const value of values) headers.append("Authentication-Results", value);
+  return headers.get("authentication-results")!;
+}
 
 function input(
   overrides: Partial<ForwardAuthorizationInput> = {}
 ): ForwardAuthorizationInput {
   return {
     forwardSender: SENDER,
-    forwardSecret: SECRET,
-    presentedSecrets: [SECRET],
     envelopeFrom: SENDER,
     headerFromAddresses: [SENDER],
-    authenticationResults: [PASSING_HEADER],
+    platformAuthenticationResults: joined(PLATFORM_PASS),
     ...overrides,
   };
 }
 
-/** A header a spoofer can write: Cloudflare's authserv-id and every pass. */
-const FORGED_CLOUDFLARE_PASS =
-  "mx.cloudflare.net; dkim=pass header.d=example.com; " +
-  "spf=pass smtp.mailfrom=sender@example.com; dmarc=pass header.from=example.com";
+describe("decideForward: only the platform-prepended header counts", () => {
+  test("forwards when the platform's header shows dmarc=pass for the sender's domain", () => {
+    assert.deepEqual(decideForward(input()), {
+      forward: true,
+      reason: "authenticated",
+    });
+  });
 
-describe("decideForward: the shared secret is required", () => {
-  test("a forged mx.cloudflare.net dmarc=pass header alone does not forward when the secret is absent", () => {
-    // The review's reproduction: spoofed address plus a forged
-    // Authentication-Results and nothing else.
+  test("a forged mx.cloudflare.net dmarc=pass below the platform's dmarc=fail does not forward", () => {
+    // The sender's copy is appended after the platform's by Headers.get().
     assert.deepEqual(
       decideForward(
-        input({
-          presentedSecrets: [],
-          authenticationResults: [FORGED_CLOUDFLARE_PASS],
-        })
+        input({ platformAuthenticationResults: joined(PLATFORM_FAIL, FORGED_PASS) })
       ),
-      { forward: false, reason: "forward-secret-mismatch" }
+      { forward: false, reason: "dmarc-not-pass" }
     );
   });
 
-  test("a forged mx.cloudflare.net dmarc=pass header does not forward with a wrong secret", () => {
-    for (const presented of [
-      "wrong-secret-0123456789abcdef0123456789",
-      SECRET.slice(0, -1),
-      SECRET + "x",
-      SECRET.toUpperCase(),
-      "",
+  test("a forged header cannot hide the platform's result with stray quotes or parentheses", () => {
+    for (const trick of [
+      'mx.cloudflare.net; dmarc=fail header.from="example.com',
+      "mx.cloudflare.net; dmarc=fail header.from=example.com (",
     ]) {
-      assert.deepEqual(
-        decideForward(
-          input({
-            presentedSecrets: [presented],
-            authenticationResults: [FORGED_CLOUDFLARE_PASS],
-          })
-        ),
-        { forward: false, reason: "forward-secret-mismatch" },
-        `presented=${JSON.stringify(presented)}`
-      );
-    }
-  });
-
-  test("refuses more than one X-Forward-Secret header, even if one is right", () => {
-    for (const presentedSecrets of [
-      ["wrong", SECRET],
-      [SECRET, "wrong"],
-      [SECRET, SECRET],
-    ]) {
+      const value = joined(trick, `x"; ${FORGED_PASS}`);
       assert.equal(
-        decideForward(input({ presentedSecrets })).reason,
-        "forward-secret-mismatch"
+        decideForward(input({ platformAuthenticationResults: value })).forward,
+        false,
+        value
       );
     }
   });
 
-  test("never forwards when FORWARD_SECRET is unset, empty or too short, even if the message presents that value", () => {
-    for (const forwardSecret of [undefined, "", "   ", "short", "x".repeat(31)]) {
+  test("missing platform signal does not forward", () => {
+    for (const value of [null, "", "   "]) {
       assert.deepEqual(
-        decideForward(
-          input({
-            forwardSecret,
-            presentedSecrets: [forwardSecret ?? ""],
-          })
-        ),
-        { forward: false, reason: "forward-secret-not-configured" },
-        `forwardSecret=${JSON.stringify(forwardSecret)}`
+        decideForward(input({ platformAuthenticationResults: value })),
+        { forward: false, reason: "missing-platform-authentication-results" },
+        JSON.stringify(value)
       );
     }
   });
 
-  test("the correct secret from the configured sender forwards", () => {
-    assert.deepEqual(decideForward(input()), {
-      forward: true,
-      reason: "authenticated",
-    });
-  });
-
-  test("the correct secret does not help a different sender", () => {
+  test("a platform header whose authserv-id is not Cloudflare's does not forward", () => {
+    const other = "mx.attacker.example; dmarc=pass header.from=example.com";
     assert.equal(
-      decideForward(input({ envelopeFrom: "attacker@evil.example" })).reason,
-      "sender-mismatch"
+      decideForward(input({ platformAuthenticationResults: joined(other, FORGED_PASS) }))
+        .reason,
+      "untrusted-authserv-id"
     );
   });
-});
 
-describe("decideForward", () => {
-  test("forwards a message that passes DMARC with aligned SPF and DKIM", () => {
-    assert.deepEqual(decideForward(input()), {
-      forward: true,
-      reason: "authenticated",
-    });
+  test("never forwards when FORWARD_SENDER is unset, empty or malformed", () => {
+    for (const forwardSender of [undefined, "", "   ", "not-an-address", "a@b", "@example.com"]) {
+      assert.deepEqual(
+        decideForward(input({ forwardSender })),
+        { forward: false, reason: "forward-sender-not-configured" },
+        JSON.stringify(forwardSender)
+      );
+    }
   });
 
   test("compares addresses case-insensitively", () => {
     assert.equal(
       decideForward(
         input({
-          forwardSender: " Sender@Example.com ",
-          envelopeFrom: "SENDER@example.COM",
+          forwardSender: "Sender@Example.COM",
+          envelopeFrom: "SENDER@example.com",
+          headerFromAddresses: ["sender@EXAMPLE.com"],
         })
       ).forward,
       true
     );
   });
 
-  test("never forwards when FORWARD_SENDER is unset, empty or malformed", () => {
-    for (const forwardSender of [undefined, "", "   ", "example.com", "a@b@c.com", "x@localhost"]) {
-      assert.deepEqual(
-        decideForward(input({ forwardSender })),
-        { forward: false, reason: "forward-sender-not-configured" },
-        `forwardSender=${JSON.stringify(forwardSender)}`
-      );
-    }
-  });
-
   test("refuses when the envelope or From: header is someone else", () => {
     for (const overrides of [
-      { envelopeFrom: "attacker@evil.example" },
-      { headerFromAddresses: ["attacker@evil.example"] },
+      { envelopeFrom: "other@example.com" },
+      { headerFromAddresses: ["other@example.com"] },
+      { headerFromAddresses: [SENDER, "other@example.com"] },
       { headerFromAddresses: [] },
-      { headerFromAddresses: [SENDER, "attacker@evil.example"] },
     ]) {
       assert.equal(decideForward(input(overrides)).reason, "sender-mismatch");
     }
   });
 
-  test("refuses a faked sender with no Authentication-Results", () => {
-    assert.deepEqual(decideForward(input({ authenticationResults: [] })), {
-      forward: false,
-      reason: "missing-authentication-results",
-    });
+  test("refuses a dmarc=pass for a different domain or a lookalike subdomain", () => {
+    for (const domain of ["attacker.example", "evil.example.com", "example.com.evil"]) {
+      const header = `mx.cloudflare.net; dmarc=pass header.from=${domain}`;
+      assert.equal(
+        decideForward(input({ platformAuthenticationResults: header })).reason,
+        "dmarc-not-pass",
+        domain
+      );
+    }
   });
 
-  test("refuses when DMARC failed", () => {
-    const header =
-      "mx.cloudflare.net; dkim=none; dmarc=fail header.from=example.com; " +
-      "spf=softfail smtp.mailfrom=sender@example.com";
+  test("refuses a dmarc=pass with no header.from", () => {
     assert.equal(
-      decideForward(input({ authenticationResults: [header] })).reason,
+      decideForward(
+        input({ platformAuthenticationResults: "mx.cloudflare.net; spf=pass; dkim=pass; dmarc=pass" })
+      ).reason,
       "dmarc-not-pass"
     );
   });
 
-  test("refuses a dmarc=pass for a different domain", () => {
-    const header =
-      "mx.cloudflare.net; dkim=pass header.d=evil.example; " +
-      "dmarc=pass header.from=evil.example; spf=pass smtp.mailfrom=a@evil.example";
+  test("refuses when the platform's header has no DMARC result", () => {
     assert.equal(
-      decideForward(input({ authenticationResults: [header] })).reason,
+      decideForward(
+        input({ platformAuthenticationResults: "mx.cloudflare.net; spf=pass smtp.mailfrom=sender@example.com" })
+      ).reason,
       "dmarc-not-pass"
     );
   });
 
-  test("refuses a lookalike subdomain of the sender's domain", () => {
+  test("refuses two DMARC results in the platform's header as ambiguous", () => {
     const header =
-      "mx.cloudflare.net; dkim=pass header.d=example.com.evil.example; " +
-      "dmarc=pass header.from=example.com.evil.example";
+      "mx.cloudflare.net; dmarc=fail header.from=example.com; dmarc=pass header.from=example.com";
     assert.equal(
-      decideForward(input({ authenticationResults: [header] })).reason,
-      "dmarc-not-pass"
-    );
-  });
-
-  test("refuses dmarc=pass with no aligned SPF or DKIM pass", () => {
-    const header =
-      "mx.cloudflare.net; dkim=pass header.d=evil.example; " +
-      "dmarc=pass header.from=example.com; spf=pass smtp.mailfrom=a@evil.example";
-    assert.equal(
-      decideForward(input({ authenticationResults: [header] })).reason,
-      "no-aligned-spf-or-dkim-pass"
-    );
-  });
-
-  test("accepts DKIM alone or SPF alone as the aligned pass", () => {
-    const dkimOnly =
-      "mx.cloudflare.net; dkim=pass header.d=example.com; " +
-      "dmarc=pass header.from=example.com; spf=fail smtp.mailfrom=sender@example.com";
-    const spfOnly =
-      "mx.cloudflare.net; dkim=fail header.d=example.com; " +
-      "dmarc=pass header.from=example.com; spf=pass smtp.mailfrom=sender@example.com";
-    assert.equal(decideForward(input({ authenticationResults: [dkimOnly] })).forward, true);
-    assert.equal(decideForward(input({ authenticationResults: [spfOnly] })).forward, true);
-  });
-
-  test("ignores a forged pass header below the real one", () => {
-    const real =
-      "mx.cloudflare.net; dkim=none; dmarc=fail header.from=example.com; " +
-      "spf=fail smtp.mailfrom=sender@example.com";
-    assert.equal(
-      decideForward(input({ authenticationResults: [real, PASSING_HEADER] })).reason,
-      "dmarc-not-pass"
-    );
-  });
-
-  test("refuses when the topmost header is not from Cloudflare", () => {
-    const forged = PASSING_HEADER.replace("mx.cloudflare.net", "mx.evil.example");
-    assert.equal(
-      decideForward(input({ authenticationResults: [forged] })).reason,
-      "untrusted-authserv-id"
+      decideForward(input({ platformAuthenticationResults: header })).reason,
+      "ambiguous-dmarc-result"
     );
   });
 
   test("does not read a dmarc=pass hidden in a comment", () => {
     const header =
       "mx.cloudflare.net; dmarc=fail (dmarc=pass header.from=example.com) " +
-      "header.from=example.com; spf=pass smtp.mailfrom=sender@example.com";
+      "header.from=example.com";
     assert.equal(
-      decideForward(input({ authenticationResults: [header] })).reason,
+      decideForward(input({ platformAuthenticationResults: header })).reason,
       "dmarc-not-pass"
     );
+  });
+});
+
+describe("firstHeaderValue", () => {
+  test("returns the only header unchanged", () => {
+    assert.equal(firstHeaderValue(PLATFORM_PASS), PLATFORM_PASS);
+  });
+
+  test("returns only the first of several joined headers", () => {
+    assert.equal(firstHeaderValue(joined(PLATFORM_FAIL, FORGED_PASS)), PLATFORM_FAIL);
+  });
+
+  test("returns null when there is no header", () => {
+    assert.equal(firstHeaderValue(null), null);
+    assert.equal(firstHeaderValue(""), null);
   });
 });
 

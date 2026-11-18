@@ -13,7 +13,7 @@ import type { ParsedMail } from "mailparser";
 import type { CreateEmailOptions } from "resend";
 import {
   decideForward,
-  FORWARD_SECRET_HEADER,
+  firstHeaderValue,
   normaliseForwardSender,
 } from "./forwardAuthorization.ts";
 
@@ -22,13 +22,17 @@ export interface InboundMessage {
   from: string;
   /** SMTP envelope recipient, i.e. the inbox. */
   to: string;
+  /**
+   * The Worker `EmailMessage`'s `headers`. Cloudflare Email Routing prepends
+   * its own `Authentication-Results` here, which is the only thing the forward
+   * decision trusts. See `forwardAuthorization.ts`.
+   */
+  headers: Pick<Headers, "get">;
 }
 
 export interface InboundEmailDeps {
   /** `FORWARD_SENDER`. Unset or empty disables forwarding entirely. */
   forwardSender: string | undefined;
-  /** `FORWARD_SECRET`. Unset, empty or short disables forwarding entirely. */
-  forwardSecret: string | undefined;
   /** INSERT the message and its attachments. */
   storeEmail(
     message: InboundMessage,
@@ -57,15 +61,16 @@ export async function processInboundEmail(
   const headerFromAddresses = (email.from?.value ?? []).map(
     (address) => address.address ?? ""
   );
-  const authenticationResults = headerValues(email, "authentication-results");
+  // From the platform's `message.headers`, never from the parsed raw message:
+  // the raw message is the sender's text.
+  const platformAuthenticationResults = message.headers.get(
+    "authentication-results"
+  );
   const decision = decideForward({
     forwardSender: deps.forwardSender,
-    forwardSecret: deps.forwardSecret,
-    // Never logged: a wrong value could be a near-miss of the real secret.
-    presentedSecrets: headerValues(email, FORWARD_SECRET_HEADER),
     envelopeFrom: message.from,
     headerFromAddresses,
-    authenticationResults,
+    platformAuthenticationResults,
   });
 
   console.log(
@@ -99,7 +104,7 @@ export async function processInboundEmail(
         to: message.to,
         from: message.from,
         reason: decision.reason,
-        authenticationResults: authenticationResults[0] ?? null,
+        authenticationResults: firstHeaderValue(platformAuthenticationResults),
       })
     );
   }
@@ -172,16 +177,4 @@ export async function processInboundEmail(
     `Email sent to ${inbox.receiver}`,
     `Email sent to ${inbox.receiver}`
   );
-}
-
-/**
- * Every value of the header `key` (lowercase), topmost first, from
- * mailparser's ordered raw header lines. Not `email.headers`, which keeps only
- * one value per name in some versions, and not `message.headers`, which merges
- * repeats.
- */
-function headerValues(email: ParsedMail, key: string): string[] {
-  return email.headerLines
-    .filter((header) => header.key === key)
-    .map((header) => header.line.replace(/^[^:]*:\s*/, ""));
 }

@@ -18,8 +18,6 @@ interface CloudflareEnv {
   CLERK_SECRET_KEY: string;
   /** Optional. Unset or empty disables forwarding. See .env.schema. */
   FORWARD_SENDER?: string;
-  /** Optional. Unset or empty disables forwarding. See .env.schema. */
-  FORWARD_SECRET?: string;
   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: string;
   PUSHER_APP_ID: string;
   PUSHER_CLUSTER: string;
