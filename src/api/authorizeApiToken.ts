@@ -46,10 +46,9 @@ export function withApiToken<Args extends unknown[]>(
       return await handler(request, ...args);
     } catch (error) {
       console.error("v1 api error", error);
-      return Response.json(
-        { error: error instanceof Error ? error.message : "internal error" },
-        { status: 500 }
-      );
+      // Never return error.message: database/driver errors can reveal table
+      // names, hosts or query text. The full error is in the log above.
+      return Response.json({ error: "internal error" }, { status: 500 });
     }
   };
 }
