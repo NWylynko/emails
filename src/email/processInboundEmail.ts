@@ -13,6 +13,7 @@ import type { ParsedMail } from "mailparser";
 import type { CreateEmailOptions } from "resend";
 import {
   decideForward,
+  FORWARD_SECRET_HEADER,
   normaliseForwardSender,
 } from "./forwardAuthorization.ts";
 
@@ -26,6 +27,8 @@ export interface InboundMessage {
 export interface InboundEmailDeps {
   /** `FORWARD_SENDER`. Unset or empty disables forwarding entirely. */
   forwardSender: string | undefined;
+  /** `FORWARD_SECRET`. Unset, empty or short disables forwarding entirely. */
+  forwardSecret: string | undefined;
   /** INSERT the message and its attachments. */
   storeEmail(
     message: InboundMessage,
@@ -54,9 +57,12 @@ export async function processInboundEmail(
   const headerFromAddresses = (email.from?.value ?? []).map(
     (address) => address.address ?? ""
   );
-  const authenticationResults = authenticationResultsHeaders(email);
+  const authenticationResults = headerValues(email, "authentication-results");
   const decision = decideForward({
     forwardSender: deps.forwardSender,
+    forwardSecret: deps.forwardSecret,
+    // Never logged: a wrong value could be a near-miss of the real secret.
+    presentedSecrets: headerValues(email, FORWARD_SECRET_HEADER),
     envelopeFrom: message.from,
     headerFromAddresses,
     authenticationResults,
@@ -169,12 +175,13 @@ export async function processInboundEmail(
 }
 
 /**
- * Every `Authentication-Results` header value, topmost first, from mailparser's
- * ordered raw header lines. Not `email.headers`, which keeps only one value per
- * name in some versions, and not `message.headers`, which merges repeats.
+ * Every value of the header `key` (lowercase), topmost first, from
+ * mailparser's ordered raw header lines. Not `email.headers`, which keeps only
+ * one value per name in some versions, and not `message.headers`, which merges
+ * repeats.
  */
-function authenticationResultsHeaders(email: ParsedMail): string[] {
+function headerValues(email: ParsedMail, key: string): string[] {
   return email.headerLines
-    .filter((header) => header.key === "authentication-results")
+    .filter((header) => header.key === key)
     .map((header) => header.line.replace(/^[^:]*:\s*/, ""));
 }
